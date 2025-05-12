@@ -64,10 +64,9 @@
 ;; atom processing
 
 ;; database
-(defvar *sample-db* nil)
-
 (defclass table ()
-  ((rows :accessor rows :initarg :rows :initform nil)
+  ((name :accessor name :initarg :name)
+   (rows :accessor rows :initarg :rows :initform nil)
    (schema :accessor schema :initarg :schema)))
 
 (defclass column ()
@@ -130,35 +129,6 @@
      :type-props t-props
      :default-value (or default-value (default-value t-props)))))
 
-;; (defgeneric make-column (name type &optional default-value))
-
-;; (defmacro make-colmethod (type
-;;                           comparator
-;;                           eq-predicate
-;;                           &optional default-value)
-;;   `(defmethod make-column (name ,type &optional default-value)
-;;      (make-instance
-;;       'column
-;;       :name name
-;;       ;; :col-type ,type
-;;       :comparator ,comparator
-;;       :eq-predicate ,eq-predicate
-;;       :default-value ,default-value)))
-
-;; (make-colmethod (type (eql 'string))
-;;                 #'string<
-;;                 #'string=
-;;                 "")
-
-;; (make-colmethod (type (eql 'number))
-;;                 #'<
-;;                 #'=
-;;                 0)
-
-
-;; (make-colmethod (type (eql 'boolean))
-;;                 #'t-first
-;;                 #'eq)
 
 (defun mk-schema (spec)
   (mapcar #'(lambda (column-spec) (apply #'make-column column-spec)) spec))
@@ -181,9 +151,20 @@
 (schema-names *sample-schema*)
 
 (defvar *sample-table*
-  (make-instance 'table :schema *sample-schema*))
+  (make-instance 'table :name :sample-table :schema *sample-schema*))
 
 (rows *sample-table*)
+
+;; (defun validate-with-schema (schema values validate)
+;;   (loop for column in schema
+;;         for name = (name column)
+;;         for type = (name (type-props column))
+;;         for value = (or (getf values name) (default-value column))
+;;         collect name
+;;         collect (if (collect)
+;;                     value
+;;                     (error "~S is not of type ~S for column ~S"
+;;                            value type name))))
 
 (defun validate-row (schema values)
   (loop for column in schema
@@ -193,7 +174,8 @@
         collect name
         collect (if (typep value type)
                     value
-                    (error "~S is not of type ~S for column ~S" value type name))))
+                    (error "~S is not of type ~S for column ~S"
+                           value type name))))
 
 (defun insert-row (table values)
   (push (validate-row (schema table) values) (rows table)))
@@ -205,7 +187,99 @@
 (insert-row *sample-table* '())
 (insert-rows *sample-table* '() '(:column1 "aaa"))
 
-(rows *sample-table*)
+;; (rows *sample-table*)
+
+(defclass database ()
+  ((name
+    :reader name
+    :initarg :name)
+   (tables
+    :reader tables
+    :initarg :tables
+    :initform nil)
+   (rules
+    :reader rules
+    :initarg :rules
+    :initform nil)))
+
+;; rule processing
+;; (defrule predicate-name (atom) (atoms))
+;; (body-name &rest props)
+
+;; terms are plist
+;; term    ::= variable | constant ;
+
+(variable-p (getf '(:column1 ?a) :column1))
+
+(defun validate-terms (schema terms)
+  (loop for column in schema
+        for name = (name column)
+        for type = (name (type-props column))
+        for value = (or (getf terms name) (default-value column))
+        collect name
+        collect (if (or (typep value type) (variable-p value))
+                    value
+                    (error "~S is not of type ~S for column ~S"
+                           value type name))))
+
+(validate-terms *sample-schema* '(:column1 ?a))
+
+;; (defclass datom ()
+;;   ((name
+;;     :reader name ;; table or another datom
+;;     :initarg :name)
+;;    (schema
+;;     :reader schema
+;;     :initarg :schema)
+;;    (terms
+;;     :reader terms
+;;     :initarg :terms)))
+
+;; ;; (defun validate-datom (based-on values))
+
+;; (defun make-datom-from-table (table terms)
+;;   (make-instance
+;;    'datom
+;;    :name (name table)
+;;    :schema (schema table)
+;;    :terms (validate-terms (schema table) terms)))
+
+;; (make-datom-from-table *sample-table* '(:column1 ?a))
+
+;; (defvar *sample-datom* (make-datom-from-table *sample-table* '(:column1 ?a
+;;                                                                :column2 ?b)))
+;; (terms *sample-datom*)
+
+;; (defun mk-body (datoms)
+;;   (mapcar #'(lambda (datom) (apply #'make-column column-spec)) spec))
+
+(defclass rule ()
+  ((name
+    :reader name
+    :initarg :name)
+   (head ;; terms
+    :reader head
+    :initarg :head)
+   (body ;; other rules
+    :reader body
+    :initarg :body)))
+
+;; a rule without a body is an atom (datom)
+
+(defun make-rule-from-table (table terms)
+  (make-instance
+   'rule
+   :name (name table)
+   :head (validate-terms (schema table) terms)
+   :body nil))
+
+(defvar *sample-rule* (make-rule-from-table *sample-table* '(:column1 ?a
+                                                             :column2 ?b)))
+(head *sample-rule*)
+;; (defmacro defrule (name head body))
+
+
+;; (defvar *sample-db* nil)
 
 ;; (append '(1 2 3) '(4 5 6))
 ;; (mapcar #'(lambda (x y) (cons x y)) '(1 2 3) '(4 5 6))
