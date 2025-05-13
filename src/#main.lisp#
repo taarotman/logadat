@@ -353,6 +353,9 @@
   (push table (tables db)))
 
 
+
+;; 
+
 ;; (defun fact-processing-db (db parent-rule body-part)
 ;;   )
 
