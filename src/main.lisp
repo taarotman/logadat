@@ -9,7 +9,6 @@
 ;; <term-list> ::= <term> | <term> "," <term-list> | ""
 ;; <term>      ::= <constant> | <variable>
 
-(defvar *db-rules* nil)
 
 (defmacro symbolp-r (x &rest body)
   `(and (symbolp ,x)
@@ -150,18 +149,6 @@
 (defun schema-names (schema)
   (schema-slot schema 'name))
 
-(defvar *sample-schema*
-  (make-schema
-   (:column1 string "default")
-   (:column2 number 123)
-   (:column3 boolean)))
-
-(schema-names *sample-schema*)
-
-(defvar *sample-table*
-  (make-instance 'table :name :sample-table :schema *sample-schema*))
-
-(rows *sample-table*)
 
 ;; (defun validate-with-schema (schema values validate)
 ;;   (loop for column in schema
@@ -192,10 +179,6 @@
   (dolist (r rows table)
     (insert-row table r)))
 
-(insert-row *sample-table* '())
-(insert-rows *sample-table* '() '(:column1 "aaa"))
-
-(rows *sample-table*)
 
 ;; (rows *sample-table*)
 
@@ -220,7 +203,6 @@
                     (error "~S is not a variable nor of type ~S for column ~S"
                            value type name))))
 
-(validate-terms-from-schema *sample-schema* '(:column1 ?a))
 
 (defclass rule ()
   ((name
@@ -257,9 +239,6 @@
   ;;  :body nil)
   )
 
-(defvar *sample-rule* (make-fact-from-table *sample-table* '(:column1 ?a
-                                                             :column2 ?b)))
-(head *sample-rule*)
 
 (defun keys (plist)
   (loop for (key value) on plist by #'cddr
@@ -297,19 +276,6 @@
                              (fact-processing rule b)))
                      body))))
 
-(defvar *sample-rule2*
-  (make-rule :sample-rule
-             '(:col1 ?x :col2 ?y)
-             '(
-               (:a-fact (:c1 ?z))
-               (:sample-rule (:col1 ?y :col2 ?z))
-               )))
-
-(head *sample-rule2*)
-
-(mapcar #'head (body *sample-rule2*)) 
-
-(caddr '(1 2 3 4))
 
 
 ;; rule (:name head body
@@ -325,30 +291,6 @@
     :accessor rules
     :initarg :rules
     :initform nil)))
-
-(defvar *sample-db*
-  (make-instance
-   'database
-   :name 'sample-db))
-
-
-(defun ins-rule (db rule)
-  (push rule (rules db)))
-
-(defun insert-rule (db rule)
-  (ins-rule db (make-rule (car rule) (cadr rule) (caddr rule) db)))
-
-(ins-rule *sample-db* *sample-rule2*)
-
-(insert-rule *sample-db* '(:n (:c1 ?x :c2 ?y) nil))
-
-(insert-rule *sample-db* '(:n2 (:c1 ?x :c2 ?y) ((:n ( :c1 ?y :c2 ?x)))
-                           ))
-
-(mapcar #'(lambda (r) (list (name r) (head r)
-                            (mapcar #'(lambda (br) (cons (name br) (head br)))
-                                    (body r))))
-        (rules *sample-db*))
 
 
 (defun ins-table (db table)
@@ -380,27 +322,16 @@
                      (constants-p row constants))
                  rows))
 
-(defvar *sample-rows* (rows *sample-table*)) 
-(filter-rows *sample-rows* '(:column1 "default"))
-
 (defmacro values-as-keys (row k v)
   `(list (intern (string ,v) "KEYWORD") (getf ,row ,k)))
-
-(values-as-keys '(:col1 123) :col1 'x)
-
 
 (defun assoc-variables (row variables)
   (apply #'append (collect-keyvalue (lambda (k v)
                                         (values-as-keys row k v))
                                     variables)))
 
-(assoc-variables '(:column1 "abc" :column2 "def") '(:column1 ?a))
-
 (defun select-column (rows variables)
   (mapcar #'(lambda (row) (assoc-variables row variables)) rows))
-
-(select-column *sample-rows* '(:column1 ?X))
-
 
 (defun terms-variables (terms)
   (apply #'append (collect-keyvalue (lambda (k v)
@@ -412,9 +343,6 @@
                                       (if (not (variable-p v)) (list k v)))
                                     terms)))
 
-(terms-variables '(:c1 ?a :c2 abc :c3 ?x))
-(terms-constants '(:c1 ?a :c2 abc :c3 ?x))
-
 (defun query-rows (rows terms)
   (let ((variables (terms-variables terms))
         (constants (terms-constants terms)))
@@ -422,19 +350,66 @@
     (select-column (filter-rows rows constants) variables)
     ))
 
-(query-rows *sample-rows* '(:column1 "default" :column2 ?x :column3 ?x))
-
 
 (defun query-table (table terms)
   (query-rows (rows table) terms))
 
-(query-table *sample-table* '(:column1 "aaa" :column2 ?x :column3 ?x))
-
 
 ;; query evaluation
+(defun query-rule (rule terms)
+  (let ((variables (terms-variables terms))
+        (constants (terms-constants terms))
+        (head (head rule))
+        (body (body rule)))
+    )
+  )
+
+(defun query (name terms rules tables)
+  (cond (((find-name name tables)
+          (query-table (find-name name tables) terms))
+         (t nil))))
 ;; (fact ?X const) means select all X in fact with cons
 
 ;; unification
 ;; substitution
 
 
+;; printing
+(defun print-list (list)
+  (dolist (e list)
+    (print e)))
+
+(defun print-rows (table) (print-list (rows table)))
+(defun print-query (query) (print-list query))
+
+
+;; testing
+(defvar *sample-schema*
+  (make-schema
+   (:c1 number)
+   (:c2 string "default")
+   (:c3 boolean)))
+
+(defvar *sample-table*
+  (make-instance
+   'table
+   :name :sample-table
+   :schema *sample-schema*))
+
+(insert-rows *sample-table*
+ '(:c1 123 :c2 "abc" :c3 t)
+ '(:c2 "abc")
+ '(:c2 "abc" :c3 t)
+ '(:c1 123)
+             )
+
+;; (defvar *sample-rows*
+;;   (rows *sample-table*))
+
+(print-rows *sample-table*)
+
+(defvar *sample-table-query*
+  (query-table *sample-table*
+   '(:c1 ?c1 :c2 "abc" :c3 t)))
+
+(print-query *sample-table-query*)
