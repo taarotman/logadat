@@ -195,6 +195,8 @@
 (insert-row *sample-table* '())
 (insert-rows *sample-table* '() '(:column1 "aaa"))
 
+(rows *sample-table*)
+
 ;; (rows *sample-table*)
 
 
@@ -353,67 +355,86 @@
   (push table (tables db)))
 
 
-;; (defun fact-processing-db (db parent-rule body-part)
-;;   )
+;; select columns of variables in terms
+;; filter based on columns of constants
+(defun collect-keyvalue (fun plist)
+  (loop for (key value) on plist by #'cddr
+        collect (funcall fun key value)))
 
-;; (defun make-rule-db (db name head body)
-;;   (let ((rule (make-fact name head)))
-;;     )
-;;   )
-
-;; (defun validate-fact (rule)
-;;   (if (body rule)
-;;       (error "Fact cannot be a rule with a body")
-;;       rule))
-
-;; (defun validate-body (body)
-;;   (mapcar #'validate-fact body))
-
-;; (defun validate-body (body)
-;;   (dolist (f body)
-;;     (cond (())))
-;;   ;; (mapcar #'validate-fact body)
-;;   )
+(defun constants-p-list (row constants)
+  (collect-keyvalue (lambda (k v) (equal v (getf row k))) constants))
+;; (defun constants-p-list (row constants)
+;;   (loop for (key value) on constants by #'cddr
+;;         collect (equal value (getf row key))))
 
 
-;; (defun make-rule (name head body)
-;;   (mk-rule (name
-;;             head
-;;             (dolist (f body)
-;;               ))))
-;; (defmacro defrule (name head body))
+(constants-p-list '(:a 1 :b 2) '(:a 1 :b 3))
+
+(defun constants-p (row constants)
+  (every #'identity (constants-p-list row constants)))
+
+(constants-p '(:a 1 :b 2) '(:a 1 :b 3))
+
+(defun filter-rows (rows constants)
+  (remove-if-not #'(lambda (row)
+                     (constants-p row constants))
+                 rows))
+
+(defvar *sample-rows* (rows *sample-table*)) 
+(filter-rows *sample-rows* '(:column1 "default"))
+
+(defmacro values-as-keys (row k v)
+  `(list (intern (string ,v) "KEYWORD") (getf ,row ,k)))
+
+(values-as-keys '(:col1 123) :col1 'x)
 
 
-;; (defvar *sample-db* nil)
+(defun assoc-variables (row variables)
+  (apply #'append (collect-keyvalue (lambda (k v)
+                                        (values-as-keys row k v))
+                                    variables)))
 
-;; (append '(1 2 3) '(4 5 6))
-;; (mapcar #'(lambda (x y) (cons x y)) '(1 2 3) '(4 5 6))
+(assoc-variables '(:column1 "abc" :column2 "def") '(:column1 ?a))
 
-;; (cdr (list :test 1 :test2 2))
-;; (cdr '(1 . 2))
+(defun select-column (rows variables)
+  (mapcar #'(lambda (row) (assoc-variables row variables)) rows))
 
-;; (defmethod make-column (name (type (eql 'string)) &optional default-value)
-;;   (make-instance
-;;    'column
-;;    :name name
-;;    :comparator #'string<
-;;    :eq-predicate #'string=
-;;    :default-value default-value))
+(select-column *sample-rows* '(:column1 ?X))
 
 
+(defun terms-variables (terms)
+  (apply #'append (collect-keyvalue (lambda (k v)
+                                      (if (variable-p v) (list k v)))
+                                    terms)))
 
-;; backtracking
+(defun terms-constants (terms)
+  (apply #'append (collect-keyvalue (lambda (k v)
+                                      (if (not (variable-p v)) (list k v)))
+                                    terms)))
+
+(terms-variables '(:c1 ?a :c2 abc :c3 ?x))
+(terms-constants '(:c1 ?a :c2 abc :c3 ?x))
+
+(defun query-rows (rows terms)
+  (let ((variables (terms-variables terms))
+        (constants (terms-constants terms)))
+    ;; (cons variables constants)
+    (select-column (filter-rows rows constants) variables)
+    ))
+
+(query-rows *sample-rows* '(:column1 "default" :column2 ?x :column3 ?x))
+
+
+(defun query-table (table terms)
+  (query-rows (rows table) terms))
+
+(query-table *sample-table* '(:column1 "aaa" :column2 ?x :column3 ?x))
+
+
+;; query evaluation
+;; (fact ?X const) means select all X in fact with cons
 
 ;; unification
+;; substitution
 
-;; rule processing
-;; add-rule  : Rule -> List Rule -> List Rule
-;; eval-rule : Rule -> List Rule -> Value
-
-;; term
-;; term-list
-;; atom
-;; atom-list
-;; rule
-;; program
 
