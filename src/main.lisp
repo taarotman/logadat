@@ -322,16 +322,19 @@
                      (constants-p row constants))
                  rows))
 
-(defmacro values-as-keys (row k v)
-  `(list (intern (string ,v) "KEYWORD") (getf ,row ,k)))
+(defun values-as-keys (row k v)
+  (cons v (getf row k)))
+
+;; (defmacro values-as-keys (row k v)
+;;   `(cons (intern (string ,v) "KEYWORD") (getf ,row ,k)))
 
 (defun assoc-variables (row variables)
-  (apply #'append (collect-keyvalue (lambda (k v)
-                                        (values-as-keys row k v))
-                                    variables)))
+  (collect-keyvalue (lambda (k v) (values-as-keys row k v))
+                    variables))
 
 (defun select-column (rows variables)
-  (mapcar #'(lambda (row) (assoc-variables row variables)) rows))
+  "Returns a substitution"
+  (apply #'append (mapcar #'(lambda (row) (assoc-variables row variables)) rows)))
 
 (defun terms-variables (terms)
   (apply #'append (collect-keyvalue (lambda (k v)
@@ -371,6 +374,65 @@
 ;; (fact ?X const) means select all X in fact with cons
 
 ;; unification
+(defun get-binding (x bindings)
+  (assoc x bindings))
+
+(get-binding 'x '((x . 1) (y . 2) '(x . 3)))
+
+(defun add-binding (bindings left right)
+  (cons (cons left right) bindings))
+
+(defun unify-term (left right &optional bindings)
+  (cond
+    ((eql right left) bindings)
+    ((variable-p left)  (unify-var left right bindings))
+    ((variable-p right) (unify-var right left bindings))
+    (t nil)))
+
+(defun unify-var (var x bindings)
+  (let ((var-in-bindings (get-binding var bindings))
+        (x-in-bindings (get-binding x bindings)))
+    (cond
+      (var-in-bindings
+       (unify-term (cdr var-in-bindings) x bindings))
+      ((and (variable-p x) x-in-bindings)
+       (unify-term var (cdr x-in-bindings) bindings))
+      (t (add-binding bindings var x)))))
+
+(defun zip (left right)
+  (mapcar #'list left right))
+
+(defun unify-zipped (zipped &optional bindings)
+  (let ((left (first (car zipped)))
+        (right (second (car zipped))))
+    (if (null zipped)
+        bindings
+        (unify-zipped (cdr zipped)
+               (unify-term left right bindings)))))
+
+(defun unify (left right &optional bindings)
+  (unify-zipped (zip left right) bindings))
+
+
+(setq unify1 (unify-term '?x '?y)) 
+(setq unify2 (unify-term "abc" '?y unify1)) 
+(setq unify3 (unify-term '?y '?x unify1)) 
+
+(setq zipped (zip '(1 2 3) '(4 5 6)))
+(setq unify-list (unify '(?x ?y a) '(?y ?x ?x)))
+;; (defun unify-var (x y &optional bindings)
+;;   (let ((x-in-bindings (get-binding x bindings))
+;;         (y-in-bindings (get-binding y bindings)))
+;;     (cond ((eql x y) bindings)
+;;           ()
+;;       (t (add-binding bindings x y))))
+;;   )
+
+;; (unify-var 'x 'x)
+
+;; (defun unify-var (x y &optional substitution)
+;;   (cons x y))
+
 ;; substitution
 
 
@@ -386,6 +448,7 @@
 ;; testing
 (defvar *sample-schema*
   (make-schema
+   (:id number)
    (:c1 number)
    (:c2 string "default")
    (:c3 boolean)))
@@ -396,11 +459,13 @@
    :name :sample-table
    :schema *sample-schema*))
 
+(setf (rows *sample-table*) nil)
+
 (insert-rows *sample-table*
- '(:c1 123 :c2 "abc" :c3 t)
- '(:c2 "abc")
- '(:c2 "abc" :c3 t)
- '(:c1 123)
+             '(:id 1 :c1 123 :c2 "abc" :c3 t)
+             '(:id 2)
+             '(:id 3 :c3 t :c2 "abc")
+             '(:id 4 :c3 t)
              )
 
 ;; (defvar *sample-rows*
@@ -408,8 +473,15 @@
 
 (print-rows *sample-table*)
 
-(defvar *sample-table-query*
-  (query-table *sample-table*
-   '(:c1 ?c1 :c2 "abc" :c3 t)))
+(defvar *sample-table-query*)
+
+(setq *sample-table-query*
+      (query-table *sample-table*
+                   '(
+                     :id ?identifier
+                     :c3 ?bool
+                     :c1 ?c1
+                     :c2 "abc"
+                     )))
 
 (print-query *sample-table-query*)
