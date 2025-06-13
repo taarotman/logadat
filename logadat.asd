@@ -5,7 +5,8 @@
   :depends-on ()
   :components ((:module "src"
                 :components
-                ((:file "main"))))
+                ((:file "main" :depends-on ("logadat-db"))
+                 (:file "logadat-db"))))
   :description ""
   :in-order-to ((test-op (test-op "logadat/tests"))))
 
