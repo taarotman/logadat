@@ -16,6 +16,11 @@
 ;; <term-list> ::= <term> | <term> "," <term-list> | ""
 ;; <term>      ::= <constant> | <variable>
 
+(defmacro alias (fn to)
+  `(setf (fdefinition ',to) #',fn))
+
+(defmacro compr (exp quals)
+  `(loop ))
 
 (defmacro symbolp-r (x &rest body)
   `(and (symbolp ,x)
@@ -76,239 +81,6 @@
 (defun find-name (name class-list)
   (class-find 'name name class-list))
 
-
-;; ;; database
-;; (defclass table ()
-;;   ((name :accessor name :initarg :name)
-;;    (rows :accessor rows :initarg :rows :initform nil)
-;;    (schema :accessor schema :initarg :schema :initform nil)))
-
-;; (defclass column ()
-;;   ((name
-;;     :reader name
-;;     :initarg :name)
-;;    (type-props
-;;     :reader type-props
-;;     :initarg :type-props)
-;;    (default-value
-;;     :reader default-value
-;;     :initarg :default-value)))
-
-;; (defclass type-props ()
-;;   ((name
-;;     :reader name
-;;     :initarg :name)
-;;    (comparator
-;;     :reader comparator
-;;     :initarg :comparator)
-;;    (eq-predicate
-;;     :reader eq-predicate
-;;     :initarg :eq-predicate)
-;;    (default-value
-;;     :reader default-value
-;;     :initarg :default-value)))
-
-;; ;; make make-column a defun
-;; (defgeneric make-type-props (type))
-
-;; (defmethod make-type-props ((type (eql 'string)))
-;;   (make-instance
-;;    'type-props
-;;    :name          'string
-;;    :comparator    #'string<
-;;    :eq-predicate  #'string=
-;;    :default-value ""))
-
-;; (defmethod make-type-props ((type (eql 'number)))
-;;   (make-instance
-;;    'type-props
-;;    :name          'number
-;;    :comparator    #'<
-;;    :eq-predicate  #'=
-;;    :default-value 0))
-
-;; (defmethod make-type-props ((type (eql 'boolean)))
-;;   (make-instance
-;;    'type-props
-;;    :name          'boolean
-;;    :comparator    #'(lambda (b1 b2) (car (cons b1 b2)))
-;;    :eq-predicate  #'eq
-;;    :default-value nil))
-
-;; (defun make-column (name type &optional default-value)
-;;   (let ((t-props (make-type-props type)))
-;;     (make-instance
-;;      'column
-;;      :name name
-;;      :type-props t-props
-;;      :default-value (or default-value (default-value t-props)))))
-
-
-;; (defun mk-schema (spec)
-;;   (mapcar #'(lambda (column-spec) (apply #'make-column column-spec)) spec))
-
-;; (defmacro make-schema (&rest specs)
-;;   `(mk-schema '(,@specs)))
-
-;; (defun schema-slot (schema slot)
-;;   (mapcar #'(lambda (column) (slot-value column slot)) schema))
-
-;; (defun schema-names (schema)
-;;   (schema-slot schema 'name))
-
-
-;; ;; (defun validate-with-schema (schema values validate)
-;; ;;   (loop for column in schema
-;; ;;         for name = (name column)
-;; ;;         for type = (name (type-props column))
-;; ;;         for value = (or (getf values name) (default-value column))
-;; ;;         collect name
-;; ;;         collect (if (collect)
-;; ;;                     value
-;; ;;                     (error "~S is not of type ~S for column ~S"
-;; ;;                            value type name))))
-
-;; (defun validate-row (schema values)
-;;   (loop for column in schema
-;;         for name = (name column)
-;;         for type = (name (type-props column))
-;;         for value = (or (getf values name) (default-value column))
-;;         collect name
-;;         collect (if (typep value type)
-;;                     value
-;;                     (error "~S is not of type ~S for column ~S"
-;;                            value type name))))
-
-;; (defun insert-row (table values)
-;;   (push (validate-row (schema table) values) (rows table)))
-
-;; (defun insert-rows (table &rest rows)
-;;   (dolist (r rows table)
-;;     (insert-row table r)))
-
-
-;; ;; (rows *sample-table*)
-
-
-;; ;; rule processing
-;; ;; (defrule predicate-name (atom) (atoms))
-;; ;; (body-name &rest props)
-
-;; ;; terms are plist
-;; ;; term    ::= variable | constant ;
-
-;; (variable-p (getf '(:column1 ?a) :column1))
-
-;; (defun validate-terms-from-schema (schema terms)
-;;   (loop for column in schema
-;;         for name = (name column)
-;;         for type = (name (type-props column))
-;;         for value = (or (getf terms name) (default-value column))
-;;         collect name
-;;         collect (if (or (typep value type) (variable-p value))
-;;                     value
-;;                     (error "~S is not a variable nor of type ~S for column ~S"
-;;                            value type name))))
-
-
-;; (defclass rule ()
-;;   ((name
-;;     :reader name
-;;     :initarg :name)
-;;    (head ;; terms
-;;     :reader head
-;;     :initarg :head)
-;;    (body ;; list of rules
-;;     :reader body
-;;     :initarg :body)))
-
-;; ;; a rule without a body is an fact - atom (datom)
-
-;; (defun mk-rule (name head body)
-;;   (make-instance
-;;    'rule
-;;    :name name
-;;    :head head
-;;    :body body))
-
-;; (defun make-fact (name head)
-;;   (mk-rule name head nil))
-
-;; (make-fact :abc '(:col1 ?a :col2 ?b))
-
-
-;; (defun make-fact-from-table (table terms)
-;;   (make-fact (name table) (validate-terms-from-schema (schema table) terms))
-;;   ;; (make-instance
-;;   ;;  'rule
-;;   ;;  :name (name table)
-;;   ;;  :head (validate-terms (schema table) terms)
-;;   ;;  :body nil)
-;;   )
-
-
-;; (defun keys (plist)
-;;   (loop for (key value) on plist by #'cddr
-;;         collect key))
-
-;; (defun vals (plist)
-;;   (loop for (key value) on plist by #'cddr
-;;         collect value))
-
-;; (defun validate-terms-from-rule (rule terms)
-;;   (if (equal (keys (head rule)) (keys terms))
-;;       terms
-;;       (error "~S keys do not match for ~S which are ~S"
-;;              terms
-;;              (name rule)
-;;              (keys (head rule)))))
-
-;; (defun make-fact-from-rule (rule terms)
-;;   (make-fact (name rule) (validate-terms-from-rule rule terms)))
-
-;; (defun fact-processing (parent-rule body-part &optional rules tables)
-;;   (let ((name (car body-part))
-;;         (terms (getf body-part (car body-part))))
-;;     (cond ((equal name (name parent-rule))
-;;            (make-fact-from-rule parent-rule terms))
-;;           ((find-name name rules)
-;;            (make-fact-from-rule (find-name name rules) terms))
-;;           ((find-name name tables)
-;;            (make-fact-from-table (find-name name tables) terms))
-;;           (t (make-fact name terms)))))
-
-;; (defun make-rule (name head body &optional db)
-;;   (let ((rule (make-fact name head)))
-;;     (mk-rule (name rule)
-;;              (head rule)
-;;              (mapcar #'(lambda (b)
-;;                          (if db
-;;                              (fact-processing rule b (rules db) (tables db))
-;;                              (fact-processing rule b)))
-;;                      body))))
-
-
-
-;; ;; rule (:name head body
-;; (defclass database ()
-;;   ((name
-;;     :reader name
-;;     :initarg :name)
-;;    (tables
-;;     :accessor tables
-;;     :initarg :tables
-;;     :initform nil)
-;;    (rules
-;;     :accessor rules
-;;     :initarg :rules
-;;     :initform nil)))
-
-
-;; (defun ins-table (db table)
-;;   (push table (tables db)))
-
-;; (defun ins-rule (db rule)
-;;   (push rule (rules db)))
 
 
 ;; select columns of variables in terms
@@ -466,35 +238,6 @@
 ;;                          (?y ?x ?x))))
 ;; substitution
 
-;; proving
-;; (defun query-rule (rule terms)
-;;   (let ((variables (terms-variables terms))
-;;         (constants (terms-constants terms))
-;;         (head (head rule))
-;;         (body (body rule)))
-
-;;     )
-;;   )
-
-;; (defun query (name terms rules tables)
-;;   (cond (
-;;          ((find-name name tables)
-;;           (query-table (find-name name tables) terms))
-;;          (t nil))))
-
-;; unify-row
-
-;; (defun unify-table (terms table &optional bindings-list))
-
-;; (defun query (name terms db &optional bindings-list)
-  
-;;   )
-
-;; (defun unify-row (terms row)
-;;   (let ((unified
-;;           (unify (vals terms)
-;;                  (mapcar #'(lambda (k) (getf row k)) (keys terms)))))
-;;     (zip (keys terms) unified)))
 
 ;; (defmacro ignore-errors-nw (&rest forms)
 ;;   `(handler-bind
@@ -517,12 +260,56 @@
 (setq unifyr
       (unify-row '(:name ?x     :role "severed")
                  '(:name "Mark" :role "severed")))
+(setq unifyr
+      (unify-row '(:name ?x     :role ?z)
+                 '(:name ?z     :role ?y)))
 
 (defun mapnonnil (function list)
+  "mapcar but only collect non-nil results" 
   (loop for i in list
         for result = (funcall function i)
         when result
           collect result))
+
+
+(defun union-plist (plist1 plist2)
+  (let ((keys (union (keys plist1) (keys plist2))))
+    (loop for k in keys
+          collect k
+          collect (or (getf plist1 k) (getf plist2 k)))))
+
+(union-plist '(:v1 1 :c 1 :v2 1) '(:v2 1 :v3 2))
+
+
+(defun join-pred (function row1 row2)
+  "Rows are plists"
+  (loop for (k1 v1) on row1 by #'cddr
+        when (equal v1 (getf row2 k1))
+          return (funcall function row1 row2)))
+
+(join-pred '(:v1 1 :v2 2) '(:v2 2 :v3 3))
+
+
+(defun natural-join (relation1 relation2)
+  "Combine relations if there is a common attribute"
+  (loop for r in relation1
+        for join = (mapcan #'(lambda (s) (join-pred #'union-plist r s)) relation2)
+        when join
+          collect join))
+
+(alias natural-join join)
+
+(setq join1
+      (natural-join '((:name "Harry" :empid 3415 :deptname "Finance")
+                      (:name "Sally" :empid 2241 :deptname "Sales")
+                      (:name "George" :empid 3401 :deptname "Finance")
+                      (:name "Harriet" :empid 2202 :deptname "Sales")
+                      (:name "Mary" :empid 1257 :deptname "Human Resources"))
+
+                    '((:deptname "Finance" :manager "George")
+                      (:deptname "Sales" :manager "Harriet")
+                      (:deptname "Production" :manager "Charles"))))
+
 
 (defun eval-table (terms table)
   (mapnonnil #'(lambda (row) (unify-row terms row)) (rows table))
@@ -558,18 +345,24 @@
 ;; (defun fact (n) (fix (lambda (x) (fac x)) n))
 
 ;; (setq fix-test (fact 5))
-(defun find-fact (fact list)
+(defun find-fact (fact tables)
   "note: facts are defined as rules without a body"
-  (find-if #'(lambda (table) (equal (name table) (name fact))) list))
+  (find-if #'(lambda (table) (equal (name table) (name fact))) tables))
 
-(defun eval-fact (db fact)
+(alias find-fact match-rows)
+
+;; (defun eval-fact (db fact)
+;;   "Evaluate a fact (which can be from a query or from the body of a rule)"
+;;   (let ((head (head fact))
+;;         (table? (find-fact fact (tables db)))
+;;         ;;(rules (rules db))
+;;         )
+;;     (cond (table? (eval-table head table?))
+;;           (t (error "fact not in ~S" (name db))))))
+
+(defun eval-fact (fact tables &optional bindings)
   "Evaluate a fact (which can be from a query or from the body of a rule)"
-  (let ((head (head fact))
-        (table? (find-fact fact (tables db)))
-        ;;(rules (rules db))
-        )
-    (cond (table? (eval-table head table?))
-          (t (error "fact not in ~S" (name db))))))
+  )
 
 
 ;; (defun collect-p (rule ilist elist)
@@ -580,92 +373,94 @@
 
 ;; (defun subst-rows-to-tables (subst-rows))
 
+(defun walk-body (body bindings-tables))
+
 ;; before evaluating a query, evaluate the entire program first
-(defun naive-eval (rules &optional tables subst-rows)
+(defun naive-eval (rules &optional tables bindings-tables)
   )
 
 
 ;; printing
-(defun print-list (list)
-  (dolist (e list)
-    (print e)))
+;; (defun print-list (list)
+;;   (dolist (e list)
+;;     (print e)))
 
-(defun print-rows (table) (print-list (rows table)))
-(defun print-query (query) (print-list query))
-
-
-;; testing
-(defvar *sample-schema*
-  (make-schema
-   (:name string)
-   (:role string)
-   ))
-
-(defvar *sample-table*
-  (make-instance
-   'table
-   :name :sample-table
-   :schema *sample-schema*))
-
-(setf (rows *sample-table*) nil)
-
-(insert-rows *sample-table*
-             '(:name "Milchick" :role "manager")
-             '(:name "Mark"     :role "severed")
-             '(:name "Helly"    :role "severed")
-             '(:name "Irving"   :role "severed")
-             '(:name "Dylan"    :role "severed")
-             )
-
-;; (defvar *sample-rows*
-;;   (rows *sample-table*))
-
-(print-rows *sample-table*)
-
-(setq *sample-db*
-      (make-instance
-       'database
-       :name :sample-db))
-
-(ins-table *sample-db* *sample-table*)
-
-(tables *sample-db*)
-
-(setq *sample-rule*
-      (make-rule :sample-rule '(:boss ?x :employee ?y)
-                              '((:sample-table (:name ?x :role "manager"))
-                                (:sample-table (:name ?y :role "severed")))
-                 *sample-db*))
-
-(ins-rule *sample-db* *sample-rule*)
-
-(mapcar #'name (tables *sample-db*)) 
-
-(setq *sample-rules* (rules *sample-db*))
-
-(mapcar #'head (body (car *sample-rules*))) 
-
-(setq sample-query
-      '(:name ?name
-        :role "severed"
-        ))
-
-(defvar *sample-table-query*)
-
-(setq *sample-table-query*
-      (query-table *sample-table* sample-query))
-
-(print-query *sample-table-query*)
-
-(setq evt (eval-table sample-query *sample-table*))
-(print-query evt)
+;; (defun print-rows (table) (print-list (rows table)))
+;; (defun print-query (query) (print-list query))
 
 
-(setq query-to-rule (mk-rule :sample-table sample-query nil))
-(head query-to-rule)
+;; ;; testing
+;; (defvar *sample-schema*
+;;   (make-schema
+;;    (:name string)
+;;    (:role string)
+;;    ))
 
-(setq evf (eval-fact *sample-db* query-to-rule))
+;; (defvar *sample-table*
+;;   (make-instance
+;;    'table
+;;    :name :sample-table
+;;    :schema *sample-schema*))
 
-(find-fact query-to-rule (tables *sample-db*))
+;; (setf (rows *sample-table*) nil)
+
+;; (insert-rows *sample-table*
+;;              '(:name "Milchick" :role "manager")
+;;              '(:name "Mark"     :role "severed")
+;;              '(:name "Helly"    :role "severed")
+;;              '(:name "Irving"   :role "severed")
+;;              '(:name "Dylan"    :role "severed")
+;;              )
+
+;; ;; (defvar *sample-rows*
+;; ;;   (rows *sample-table*))
+
+;; (print-rows *sample-table*)
+
+;; (setq *sample-db*
+;;       (make-instance
+;;        'database
+;;        :name :sample-db))
+
+;; (ins-table *sample-db* *sample-table*)
+
+;; (tables *sample-db*)
+
+;; (setq *sample-rule*
+;;       (make-rule :sample-rule '(:boss ?x :employee ?y)
+;;                               '((:sample-table (:name ?x :role "manager"))
+;;                                 (:sample-table (:name ?y :role "severed")))
+;;                  *sample-db*))
+
+;; (ins-rule *sample-db* *sample-rule*)
+
+;; (mapcar #'name (tables *sample-db*)) 
+
+;; (setq *sample-rules* (rules *sample-db*))
+
+;; (mapcar #'head (body (car *sample-rules*))) 
+
+;; (setq sample-query
+;;       '(:name ?name
+;;         :role "severed"
+;;         ))
+
+;; (defvar *sample-table-query*)
+
+;; (setq *sample-table-query*
+;;       (query-table *sample-table* sample-query))
+
+;; (print-query *sample-table-query*)
+
+;; (setq evt (eval-table sample-query *sample-table*))
+;; (print-query evt)
+
+
+;; (setq query-to-rule (mk-rule :sample-table sample-query nil))
+;; (head query-to-rule)
+
+;; (setq evf (eval-fact *sample-db* query-to-rule))
+
+;; (find-fact query-to-rule (tables *sample-db*))
 
 
