@@ -19,17 +19,66 @@
 (defmacro alias (fn to)
   `(setf (fdefinition ',to) #',fn))
 
-(defmacro compr (exp quals)
-  `(loop ))
-
-(defmacro symbolp-r (x &rest body)
+(defmacro symbolp-r (x &body body)
   `(and (symbolp ,x)
         ,@body))
+
+(defun lambdavar-p (x)
+  "Can X be a lambda variable?"
+  (symbolp-r x
+    (not (fboundp x))
+    (both-case-p (char (symbol-name x) 0))))
+
+(defmacro id-var (symbol list)
+  `(identity (if (equal ',symbol (car ',list))
+                 ,symbol
+                 ,list)))
+
+(defmacro qual-in-eval (var list function collectfun &optional rest-quals)
+  `(let ((v ,var))
+     (loop for v in ,list
+           for result = (if ,rest-quals
+                            (funcall ,function v ,rest-quals)
+                            (funcall ,function v)) 
+           if result
+             collect (funcall ,collectfun v))))
+
+(qual-in-eval x '(1 2 3 4 5 6)
+              #'(lambda (v) (= 0 (mod v 2)))
+              #'(lambda (v) (+ v 10)))
+
+(defmacro qual-in (exp list function &optional rest-quals)
+  (let ((symbol (find-if #'lambdavar-p exp)))
+     `(qual-in-eval ,symbol ,list ,function
+                    #'(lambda (,symbol)
+                        (id-var ,symbol ,exp))
+                    ,rest-quals)))
+
+(qual-in (x) '(1 2 3 4 5 6) #'(lambda (v) (= 0 (mod v 2))))
+
+(defun qual-filter (var &optional rest-quals))
+
+;; (defmacro compr (exp &body quals)
+;;   `(let ((qual (car ,quals)))
+;;      (case (car qual)
+;;        ('in (compr ))
+;;        (nil ,exp))))
+
+
+;; (defmacro compr (exp &body quals)
+;;   `(loop for qual in ,quals
+;;          for q =
+;;                (case (car qual)
+;;                  (in (loop for ))
+;;                  (t ,exp))
+;;          collect q))
+
 
 ;; variable processing
 (defun variable-p (x)
   "Is X a named variable (a symbol beginning with '?')?"
-  (symbolp-r x (equal (char (symbol-name x) 0) #\?)))
+  (symbolp-r x
+    (equal (char (symbol-name x) 0) #\?)))
 
 ;; (defun anonvar-p (x)
 ;;   "Is X an anonymous variable (an underscore symbol)?"
@@ -59,6 +108,7 @@
        (typep-r x '(number string boolean))))
 
 (constant-p 'nil)
+
 
 ;; (and (symbolp '1)
 ;;      (not (variable-p '1))
@@ -287,7 +337,7 @@
         when (equal v1 (getf row2 k1))
           return (funcall function row1 row2)))
 
-(join-pred '(:v1 1 :v2 2) '(:v2 2 :v3 3))
+;; (join-pred '(:v1 1 :v2 2) '(:v2 2 :v3 3))
 
 
 (defun natural-join (relation1 relation2)
