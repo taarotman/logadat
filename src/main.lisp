@@ -16,6 +16,13 @@
 ;; <term-list> ::= <term> | <term> "," <term-list> | ""
 ;; <term>      ::= <constant> | <variable>
 
+;; https://stackoverflow.com/questions/2680864/how-to-remove-nested-parentheses-in-lisp
+(defun flatten (l)
+  (cond ((null l) nil)
+        ((atom l) (list l))
+        (t (loop for a in l appending (flatten a)))))
+
+;; https://stackoverflow.com/questions/24252539/defining-aliases-to-standard-common-lisp-functions
 (defmacro alias (fn to)
   `(setf (fdefinition ',to) #',fn))
 
@@ -34,29 +41,39 @@
                  ,symbol
                  ,list)))
 
-(defmacro qual-in-eval (var list function collectfun &optional rest-quals)
-  `(let ((v ,var))
-     (loop for v in ,list
-           for result = (if ,rest-quals
-                            (funcall ,function v ,rest-quals)
-                            (funcall ,function v)) 
-           if result
-             collect (funcall ,collectfun v))))
+(defmacro qual-in-eval (var list function collectfun)
+  `(loop for ,var in ,list
+         for satisfy = (funcall ,function ,var)
+         if satisfy
+           collect (funcall ,collectfun ,var)))
 
 (qual-in-eval x '(1 2 3 4 5 6)
               #'(lambda (v) (= 0 (mod v 2)))
               #'(lambda (v) (+ v 10)))
 
-(defmacro qual-in (exp list function &optional rest-quals)
-  (let ((symbol (find-if #'lambdavar-p exp)))
-     `(qual-in-eval ,symbol ,list ,function
+;; (defmacro qual-satisfy (var satisfy-exp)
+;;   (let ((symbol (find-if #'lambdavar-p satisfy-exp)))
+;;     `((lambda (,symbol)
+;;        (id-var ,symbol ,satisfy-exp))
+;;       ,var)))
+
+;; (qual-satisfy 10 (> x 1))
+
+(defmacro qual-in (exp list satisfier)
+  (let ((symbol (find-if #'lambdavar-p (flatten exp))))
+     `(qual-in-eval ,symbol ,list
                     #'(lambda (,symbol)
-                        (id-var ,symbol ,exp))
-                    ,rest-quals)))
+                        (id-var ,symbol ,satisfier))
+                    #'(lambda (,symbol)
+                        (id-var ,symbol ,exp)))))
 
-(qual-in (x) '(1 2 3 4 5 6) #'(lambda (v) (= 0 (mod v 2))))
+(qual-in (+ x 1) '(1 2 3 4 5 6) (= 0 (mod x 2)))
+         
 
-(defun qual-filter (var &optional rest-quals))
+;; (defun qual-filter (var filterfun &optional rest-quals)
+;;   (funcall filterfun (funcall function var rest-quals)))
+
+
 
 ;; (defmacro compr (exp &body quals)
 ;;   `(let ((qual (car ,quals)))
