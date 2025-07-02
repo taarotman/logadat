@@ -16,19 +16,46 @@
 ;; <term-list> ::= <term> | <term> "," <term-list> | ""
 ;; <term>      ::= <constant> | <variable>
 
-;; https://stackoverflow.com/questions/2680864/how-to-remove-nested-parentheses-in-lisp
+;; source: https://stackoverflow.com/questions/2680864/how-to-remove-nested-parentheses-in-lisp
 (defun flatten (l)
   (cond ((null l) nil)
         ((atom l) (list l))
         (t (loop for a in l appending (flatten a)))))
 
-;; https://stackoverflow.com/questions/24252539/defining-aliases-to-standard-common-lisp-functions
+;; source: https://stackoverflow.com/questions/24252539/defining-aliases-to-standard-common-lisp-functions
 (defmacro alias (fn to)
   `(setf (fdefinition ',to) #',fn))
+
+
+(alias mapcan mappend)
+
+(defun bind (list function)
+  "list a -> (a -> list b) -> list b"
+  (mappend function list))
+
+(defun pure (x)
+  "a -> list a"
+  (cons x nil))
+
+(bind '(1 2 3 4 5)
+      (lambda (x) (pure (* x x))))
+(bind '(1 2 3 4 5)
+      (lambda (x) (if (= (mod x 2) 0) (pure x))))
+(bind '(1 2 3 4)
+      (lambda (x) (bind '(a b)
+                        (lambda (y) (pure (cons x y))))))
+(bind '(1 2 3 4)
+      (lambda (x) (if (= (mod x 2) 0) (bind '(a b)
+                                            (lambda (y) (pure (cons x y)))))))
+
 
 (defmacro symbolp-r (x &body body)
   `(and (symbolp ,x)
         ,@body))
+
+(defun symbol= (x y)
+  (symbolp-r x
+    (string= (symbol-name x) (symbol-name y))))
 
 (defun lambdavar-p (x)
   "Can X be a lambda variable?"
@@ -36,59 +63,98 @@
     (not (fboundp x))
     (both-case-p (char (symbol-name x) 0))))
 
-(defmacro id-var (symbol list)
-  `(identity (if (equal ',symbol (car ',list))
-                 ,symbol
-                 ,list)))
+;; (defmacro id-var (symbol list)
+;;   `(identity (if (equal ',symbol (car ',list))
+;;                  ,symbol
+;;                  ,list)))
 
-(defmacro qual-in-eval (var list function collectfun)
-  `(loop for ,var in ,list
-         for satisfy = (funcall ,function ,var)
-         if satisfy
-           collect (funcall ,collectfun ,var)))
 
-(qual-in-eval x '(1 2 3 4 5 6)
-              #'(lambda (v) (= 0 (mod v 2)))
-              #'(lambda (v) (+ v 10)))
+;; ;; (defun filter-symbols (exp)
+;; ;;   (let ((cached nil))
+;; ;;    (loop for s in exp
+;; ;;         for symbol? = (lambdavar-p s)
+;; ;;         for not-cached? = (not (find s cached))
+;; ;;         when (and symbol? not-cached?)
+;; ;;           collect s)))))
 
-;; (defmacro qual-satisfy (var satisfy-exp)
-;;   (let ((symbol (find-if #'lambdavar-p satisfy-exp)))
-;;     `((lambda (,symbol)
-;;        (id-var ,symbol ,satisfy-exp))
-;;       ,var)))
+;; (defmacro qual-in-eval (var list satisfun collectfun)
+;;   `(loop for ,var in ,list
+;;          for satisfy = (funcall ,satisfun ,var)
+;;          if satisfy
+;;            collect (funcall ,collectfun ,var)))
 
-;; (qual-satisfy 10 (> x 1))
-
-(defmacro qual-in (exp list satisfier)
-  (let ((symbol (find-if #'lambdavar-p (flatten exp))))
-     `(qual-in-eval ,symbol ,list
-                    #'(lambda (,symbol)
-                        (id-var ,symbol ,satisfier))
-                    #'(lambda (,symbol)
-                        (id-var ,symbol ,exp)))))
-
-(qual-in (+ x 1) '(1 2 3 4 5 6) (= 0 (mod x 2)))
-         
-
-;; (defun qual-filter (var filterfun &optional rest-quals)
-;;   (funcall filterfun (funcall function var rest-quals)))
+;; (qual-in-eval x '(1 2 3 4 5 6)
+;;               #'(lambda (v) (= 0 (mod v 2)))
+;;               #'(lambda (v) (+ v 10)))
 
 
 
-;; (defmacro compr (exp &body quals)
-;;   `(let ((qual (car ,quals)))
-;;      (case (car qual)
-;;        ('in (compr ))
-;;        (nil ,exp))))
+;; ;; (defmacro qual-in-eval2 (var list function)
+;; ;;   `(bind list
+;; ;;          (lambda (,var)
+;; ;;            (funcall ,function ,var))))
 
 
-;; (defmacro compr (exp &body quals)
-;;   `(loop for qual in ,quals
-;;          for q =
-;;                (case (car qual)
-;;                  (in (loop for ))
-;;                  (t ,exp))
-;;          collect q))
+
+;; (defmacro qual-in (exp list satisfier)
+;;   (let ((symbol (find-if #'lambdavar-p (flatten exp))))
+;;     `(qual-in-eval ,symbol ,list
+;;                    #'(lambda (,symbol)
+;;                        (id-var ,symbol ,satisfier))
+;;                    #'(lambda (,symbol)
+;;                        (id-var ,symbol ,exp)))))
+
+;; ;; (defmacro qual-in (exp list satisfier)
+;; ;;   (let ((symbols (symbols (flatten exp))))
+;; ;;      `(qual-in-eval ,symbols ,list
+;; ;;                     #'(lambda (,symbols)
+;; ;;                         (id-var ,symbols ,satisfier))
+;; ;;                     #'(lambda (,symbols)
+;; ;;                         (id-var ,symbols ,exp)))))
+
+;; (qual-in (+ x x) '(1 2 3 4 5 6) (= 0 (mod x 2)))
+
+;; (defun filter-symbols (exp)
+;;   (let ((cached nil))
+;;    (remove-if-not
+;;     #'(lambda (s)
+;;         (when (and (lambdavar-p s) (not (find s cached)))
+;;           (push s cached)
+;;           s))
+;;     exp)))
+
+;; (defun symbols (exp)
+;;   (let ((syms (filter-symbols (flatten exp))))
+;;     (if (= (length syms) 1)
+;;         (car syms)
+;;         syms)))
+
+;; (symbols '(+ x x y (+ z x)))
+;; (symbols '(+ x x))
+
+;; (defmacro compose-quals (exp &rest quals)
+;;   )
+
+
+(defmacro compr (exp &body quals)
+  "List comprehension: [exp | qual1,qual2,..,qualn]"
+  (let ((qual (car quals))
+        (rest-quals (cdr quals)))
+    (cond ((null quals)
+           `(pure ,exp))
+          ((symbol= (car qual) 'in)
+           `(bind ,(third qual) (lambda (,(second qual))
+                                  (compr ,exp ,@rest-quals))))
+          (qual
+           `(if ,qual (compr ,exp ,@rest-quals))))))
+
+(compr (cons x y)
+  (in x '(1 2 3 4))
+  (= (mod x 2) 0)
+  (in y '(a b)))
+
+
+
 
 
 ;; variable processing
