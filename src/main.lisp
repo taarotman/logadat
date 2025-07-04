@@ -26,7 +26,6 @@
 (defmacro alias (fn to)
   `(setf (fdefinition ',to) #',fn))
 
-
 (alias mapcan mappend)
 
 (defun bind (list function)
@@ -36,6 +35,11 @@
 (defun pure (x)
   "a -> list a"
   (cons x nil))
+
+(defun id-list (x)
+  (if (not (listp x))
+      (pure x)
+      x))
 
 (bind '(1 2 3 4 5)
       (lambda (x) (pure (* x x))))
@@ -47,6 +51,8 @@
 (bind '(1 2 3 4)
       (lambda (x) (if (= (mod x 2) 0) (bind '(a b)
                                             (lambda (y) (pure (cons x y)))))))
+
+(mappend (lambda (x y) (pure (cons x y))) '(1 2 3) '(A B)) 
 
 
 (defmacro symbolp-r (x &body body)
@@ -69,6 +75,7 @@
 ;;                  ,list)))
 
 
+
 ;; ;; (defun filter-symbols (exp)
 ;; ;;   (let ((cached nil))
 ;; ;;    (loop for s in exp
@@ -77,42 +84,6 @@
 ;; ;;         when (and symbol? not-cached?)
 ;; ;;           collect s)))))
 
-;; (defmacro qual-in-eval (var list satisfun collectfun)
-;;   `(loop for ,var in ,list
-;;          for satisfy = (funcall ,satisfun ,var)
-;;          if satisfy
-;;            collect (funcall ,collectfun ,var)))
-
-;; (qual-in-eval x '(1 2 3 4 5 6)
-;;               #'(lambda (v) (= 0 (mod v 2)))
-;;               #'(lambda (v) (+ v 10)))
-
-
-
-;; ;; (defmacro qual-in-eval2 (var list function)
-;; ;;   `(bind list
-;; ;;          (lambda (,var)
-;; ;;            (funcall ,function ,var))))
-
-
-
-;; (defmacro qual-in (exp list satisfier)
-;;   (let ((symbol (find-if #'lambdavar-p (flatten exp))))
-;;     `(qual-in-eval ,symbol ,list
-;;                    #'(lambda (,symbol)
-;;                        (id-var ,symbol ,satisfier))
-;;                    #'(lambda (,symbol)
-;;                        (id-var ,symbol ,exp)))))
-
-;; ;; (defmacro qual-in (exp list satisfier)
-;; ;;   (let ((symbols (symbols (flatten exp))))
-;; ;;      `(qual-in-eval ,symbols ,list
-;; ;;                     #'(lambda (,symbols)
-;; ;;                         (id-var ,symbols ,satisfier))
-;; ;;                     #'(lambda (,symbols)
-;; ;;                         (id-var ,symbols ,exp)))))
-
-;; (qual-in (+ x x) '(1 2 3 4 5 6) (= 0 (mod x 2)))
 
 ;; (defun filter-symbols (exp)
 ;;   (let ((cached nil))
@@ -129,12 +100,18 @@
 ;;         (car syms)
 ;;         syms)))
 
-;; (symbols '(+ x x y (+ z x)))
-;; (symbols '(+ x x))
 
-;; (defmacro compose-quals (exp &rest quals)
-;;   )
-
+;; (defmacro compr (exp &body quals)
+;;   "List comprehension: [exp | qual1,qual2,..,qualn]"
+;;   (let ((qual (car quals))
+;;         (rest-quals (cdr quals)))
+;;     (cond ((null quals)
+;;            `(pure ,exp))
+;;           ((symbol= (car qual) 'in)
+;;            `(bind ,(third qual) (lambda (,(second qual))
+;;                                   (compr ,exp ,@rest-quals))))
+;;           (qual
+;;            `(if ,qual (compr ,exp ,@rest-quals))))))
 
 (defmacro compr (exp &body quals)
   "List comprehension: [exp | qual1,qual2,..,qualn]"
@@ -143,8 +120,9 @@
     (cond ((null quals)
            `(pure ,exp))
           ((symbol= (car qual) 'in)
-           `(bind ,(third qual) (lambda (,(second qual))
-                                  (compr ,exp ,@rest-quals))))
+           `(mappend (lambda ,(id-list (second qual))
+                       (compr ,exp ,@rest-quals))
+                     ,@(cddr qual)))
           (qual
            `(if ,qual (compr ,exp ,@rest-quals))))))
 
@@ -153,7 +131,10 @@
   (= (mod x 2) 0)
   (in y '(a b)))
 
-
+(compr (list x y z)
+  (in (x y) '(1 2 3 4) '(a b c))
+  (= (mod x 2) 0)
+  (in z '(d e)))
 
 
 
