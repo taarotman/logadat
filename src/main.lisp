@@ -100,29 +100,27 @@
 ;;         (car syms)
 ;;         syms)))
 
+;; (defun ziplist (list)
+;;   (apply #'mapcar #'list list))
 
-;; (defmacro compr (exp &body quals)
-;;   "List comprehension: [exp | qual1,qual2,..,qualn]"
-;;   (let ((qual (car quals))
-;;         (rest-quals (cdr quals)))
-;;     (cond ((null quals)
-;;            `(pure ,exp))
-;;           ((symbol= (car qual) 'in)
-;;            `(bind ,(third qual) (lambda (,(second qual))
-;;                                   (compr ,exp ,@rest-quals))))
-;;           (qual
-;;            `(if ,qual (compr ,exp ,@rest-quals))))))
-
+;; in1 definition
 (defmacro compr (exp &body quals)
   "List comprehension: [exp | qual1,qual2,..,qualn]"
   (let ((qual (car quals))
         (rest-quals (cdr quals)))
     (cond ((null quals)
            `(pure ,exp))
-          ((symbol= (car qual) 'in)
+          ((symbol= (car qual) 'in) ;; regular/parallel list comprehension
            `(mappend (lambda ,(id-list (second qual))
                        (compr ,exp ,@rest-quals))
                      ,@(cddr qual)))
+          ((symbol= (car qual) 'inzip) ;; zipped list comprehension
+           (let ((lambda-id (gensym)))
+             `(bind ,(third qual)
+                    (lambda (,lambda-id)
+                      (apply (lambda ,(id-list (second qual))
+                               (compr ,exp ,@rest-quals))
+                             ,lambda-id)))))
           (qual
            `(if ,qual (compr ,exp ,@rest-quals))))))
 
@@ -133,8 +131,48 @@
 
 (compr (list x y z)
   (in (x y) '(1 2 3 4) '(a b c))
-  (= (mod x 2) 0)
   (in z '(d e)))
+
+(compr x (in x '(1 2 3)))
+
+(compr (cons x z)
+  (inzip (x y) '((a b) (c d)))
+  (in z '(e f)))
+
+;; (defun dumb-function (x y z) (+ x y z))
+
+;; (apply #'dumb-function '(1 2 3))
+
+;; (setq dumb-list '((1 2 3) (11 22 33)))
+
+;; (compr var
+;;   (in var dumb-list))
+
+;; [(a -> b)] -> [a] -> [b]
+;; https://stackoverflow.com/questions/58837372/haskell-function-that-applies-a-list-of-functions-to-a-list-of-inputs
+;; (mapcar #'funcall '(+ + +) '(1 2 3) '(1 1 1))
+
+;; (funcall (lambda (x) (+ 1 x)) 1)
+
+;; ;; doesnt work with quote
+;; (setq dumb-list2 (list (lambda (x) (+ 1 x))
+;;                        (lambda (y) (+ 2 y))
+;;                        (lambda (z) (+ 3 z))))
+
+;; (mapcar #'funcall dumb-list2 '(1 1 1))
+
+;; (compr (mapcar #'funcall dumb-list2 var)
+;;   (in var dumb-list))
+
+;; (compr (apply #'dumb-function var)
+;;   (in var dumb-list))
+
+;; (compr (+ x y)
+;;   (inzip (x y) '((1 2) (3 4))))
+
+
+;; [(a,b,c), (d,e,f)] -> [(a,d), (b,e) (c,f)]
+;; (ziplist dumb-list)
 
 
 
@@ -288,7 +326,9 @@
 
 (defun unify-term (left right &optional bindings)
   (cond
-    ((equal right left) (or bindings (cons (cons t right) nil)))
+    ((equal right left) (or bindings (cons (cons t right) nil))
+     ;;(add-binding bindings right left)
+     )
     ((variable-p left)  (unify-var left right bindings))
     ((variable-p right) (unify-var right left bindings))
     (t (error "~S and ~S cannot be unified" left right))))
@@ -315,7 +355,8 @@
                (unify-term left right bindings)))))
 
 (defun unify (left right &optional bindings)
-  (unify-zipped (zip left right) bindings))
+  (ignore-errors
+   (reverse (unify-zipped (zip left right) bindings))))
 
 
 (setq unify1 (unify-term '?x '?y)) 
@@ -326,7 +367,11 @@
 (setq unify3 (unify '(?x ?z) '(?z ?y))) 
 
 ;; (setq zipped (zip '(1 2 3) '(11 22 33) '(111 222 333)))
-;; (setq unify-list (unify '(?x ?y a) '(?y ?x ?x)))
+(setq unify-list (unify '(?x ?y a) '(?y ?x ?x)))
+(setq unify-list (unify '(?x ?c ?y) '(a b c)))
+(mapcar #'cdr unify-list)
+
+(setq unify-list (unify '(?x "a") '(?y "a")))
 ;; (setq unify-list (unify '(?x ?x ?x) '(?y ?y ?y)))
 ;; (setq unify-list (unify '(?y ?x) '(?x ?y)))
 ;; (setq unify-list (unify '(?y ?x ?x) '(?x ?y a)))
@@ -386,7 +431,26 @@
           collect result))
 
 
+(defun binary-composition (function list-rx list-ry list-sy list-sz)
+  "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
+  (compr (cons x z)
+    (in (x y1) list-rx list-ry)
+    (in (y2 z) list-sy list-sz)
+    (equal y1 y2)))
+
+(defun bincomp (list-rx list-ry list-sy list-sz)
+  "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
+  (binary-composition #'cons list-rx list-ry list-sy list-sz))
+
+(bincomp '(a b c d e)
+         '(1 2 3 4 5)
+         '(3 7 2 6 4)
+         '(v w x y z))
+
+
 (defun union-plist (plist1 plist2)
+  ;; (compr (k (or (getf plist1 k) (getf plist2 k)))
+  ;;   (in k (union (keys plist1) (keys plist2))))
   (let ((keys (union (keys plist1) (keys plist2))))
     (loop for k in keys
           collect k
@@ -395,21 +459,31 @@
 (union-plist '(:v1 1 :c 1 :v2 1) '(:v2 1 :v3 2))
 
 
-(defun join-pred (function row1 row2)
+;; (defun join-pred (function row1 row2)
+;;   "Rows are plists"
+;;   (loop for (k1 v1) on row1 by #'cddr
+;;         when (equal v1 (getf row2 k1))
+;;           return (funcall function row1 row2)))
+
+(defun join-pred (row1 row2)
   "Rows are plists"
   (loop for (k1 v1) on row1 by #'cddr
         when (equal v1 (getf row2 k1))
-          return (funcall function row1 row2)))
+          return t))
+
+;; (defun join-pred (row1 row2)
+;;   (compr t
+;;     (in (k1 v1))))
 
 ;; (join-pred '(:v1 1 :v2 2) '(:v2 2 :v3 3))
 
 
 (defun natural-join (relation1 relation2)
   "Combine relations if there is a common attribute"
-  (loop for r in relation1
-        for join = (mapcan #'(lambda (s) (join-pred #'union-plist r s)) relation2)
-        when join
-          collect join))
+  (compr (union-plist r s)
+    (in r relation1)
+    (in s relation2)
+    (join-pred r s)))
 
 (alias natural-join join)
 
@@ -426,13 +500,9 @@
 
 
 (defun eval-table (terms table)
-  (mapnonnil #'(lambda (row) (unify-row terms row)) (rows table))
-  ;; (loop for row in (rows table)
-  ;;       for result = (unify-row terms row)
-  ;;       when result
-  ;;         collect result)
-  ;;(remove nil (mapcar #'(lambda (row) (unify-row terms row)) (rows table)))
-  )
+  (mapnonnil #'(lambda (row)
+                 (unify-row terms row))
+             (rows table)))
 
 (defun eval-rule (db rule)
   (let ((tables (tables db))
@@ -474,9 +544,9 @@
 ;;     (cond (table? (eval-table head table?))
 ;;           (t (error "fact not in ~S" (name db))))))
 
-(defun eval-fact (fact tables &optional bindings)
-  "Evaluate a fact (which can be from a query or from the body of a rule)"
-  )
+;; (defun eval-fact (fact tables &optional bindings)
+;;   "Evaluate a fact (which can be from a query or from the body of a rule)"
+;;   )
 
 
 ;; (defun collect-p (rule ilist elist)
@@ -487,11 +557,89 @@
 
 ;; (defun subst-rows-to-tables (subst-rows))
 
-(defun walk-body (body bindings-tables))
+;; (defun walk-body (body bindings-tables))
+
+(defun tables-to-grounds (tables)
+  "tables - list (name X schema X list row) -> facts - list (name X row)"
+  (compr (make-rule (name table) (pure p))
+    (in table tables)
+    (in p (rows table))))
+
+(setq table1
+      (mk-table :table1 (:v1 :colour :v2)
+        (1 red 2)
+        (2 blue 1)
+        (2 green 3)
+        (1 blue 4)
+        (3 red 4)
+        (4 yellow 5)))
+(rows table1)
+
+(compr (cons (name i) (head i))
+  (in i (tables-to-grounds (pure table1))))
+
+
+(defun eval-grounds0 (terms table)
+  "terms -> table -> name X list substitution"
+  (compr (cons (name table) f)
+    (in row (rows table))
+    (in f (pure (unify terms row)))
+    (identity f)))
+
+(setq subst1 (eval-grounds0 '(?x ?c ?y) table1))
+
+
+;; if variable
+
+;; if name equals subst-row name then if that doesnt exist yet in the substitiution then
+;; push that
+
+;; if not then 
+
+(defun esrow (name head subst-row)
+  (compr
+      (if )
+    (in term head)
+    (in st (cdr subst-row))
+    ))
+
+(defun eval-grounds1 (name head substitutions)
+  ;; (bind
+  ;;  substitutions
+  ;;  (lambda (subst)
+  ;;    (if (string= name (car subst))
+  ;;        (pure subst))))
+  (compr srow
+    (in subst substitutions)
+    (in srow (cdr subst))
+    ))
+
+(setq subst2 (eval-grounds1 :r1 '(?x ?y) subst1))
+
+
+(setq rule1
+      (mk-rule :rule1 (?x ?y)
+        (:table1 (?x ?c ?y))))
+(body rule1)
+
+
+;; (defun delta-init (idb edb)
+;;   (compr (eval-table (head p) tb)
+;;     (in p idb)
+;;     (= (length (body p)) 1)
+;;     (in tb (find-fact p edb))
+;;     ;; (and (= (length (body p)) 1)
+;;     ;;      (find-fact p edb))
+;;     ))
+
+;; (db-eval-init
+;;  '((1 2 3) (4 5 6)))
 
 ;; before evaluating a query, evaluate the entire program first
-(defun naive-eval (rules &optional tables bindings-tables)
-  )
+(defun eval-db (idb &optional edb bindings-db)
+  "semi-naive evaluation"
+  (let ()
+    ))
 
 
 ;; printing
