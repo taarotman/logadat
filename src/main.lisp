@@ -103,7 +103,6 @@
 ;; (defun ziplist (list)
 ;;   (apply #'mapcar #'list list))
 
-;; in1 definition
 (defmacro compr (exp &body quals)
   "List comprehension: [exp | qual1,qual2,..,qualn]"
   (let ((qual (car quals))
@@ -124,20 +123,39 @@
           (qual
            `(if ,qual (compr ,exp ,@rest-quals))))))
 
+(defmacro forc (&rest exp)
+  "List comprehension but the output expression is put last"
+  `(compr ,(car (last exp)) ,@(butlast exp)))
+
 (compr (cons x y)
   (in x '(1 2 3 4))
   (= (mod x 2) 0)
   (in y '(a b)))
 
+(forc 
+  (in x '(1 2 3 4))
+  (= (mod x 2) 0)
+  (in y '(a b))
+  (cons x y))
+
 (compr (list x y z)
   (in (x y) '(1 2 3 4) '(a b c))
   (in z '(d e)))
 
-(compr x (in x '(1 2 3)))
+(compr x
+  (in x '(1 2 3)))
 
-(compr (cons x z)
-  (inzip (x y) '((a b) (c d)))
-  (in z '(e f)))
+(setq link '((a b) (b c) (c c) (c d)))
+
+(setq p1x
+      (compr (list x z)
+        (inzip (x y) link)
+        (inzip (y1 z) link)
+        (equal y y1)))
+
+;; fix union
+(union link p1x)
+
 
 ;; (defun dumb-function (x y z) (+ x y z))
 
