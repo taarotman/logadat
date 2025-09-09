@@ -132,7 +132,7 @@
   (= (mod x 2) 0)
   (in y '(a b)))
 
-(forc 
+(forc
   (in x '(1 2 3 4))
   (= (mod x 2) 0)
   (in y '(a b))
@@ -155,6 +155,12 @@
 
 ;; fix union
 (union link p1x)
+(union link p1x :test #'equal)
+
+(defun lunion (list1 list2)
+  (union list1 list2 :test #'equal))
+
+(setq p1 (lunion link p1x))
 
 
 ;; (defun dumb-function (x y z) (+ x y z))
