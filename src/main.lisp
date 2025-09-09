@@ -158,6 +158,7 @@
 (union link p1x :test #'equal)
 
 (defun lunion (list1 list2)
+  "union but with equal instead"
   (union list1 list2 :test #'equal))
 
 (setq p1 (lunion link p1x))
