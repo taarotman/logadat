@@ -147,11 +147,21 @@
 
 (setq link '((a b) (b c) (c c) (c d)))
 
+(defun bincomp (list1 list2 &optional (exp #'list))
+  "(x z) for every (x y) in list1 for every (y z) in list2"
+  (compr (funcall exp x z)
+    (inzip (x y1) list1)
+    (inzip (y2 z) list2)
+    (equal y1 y2)))
+
 (setq p1x
       (compr (list x z)
         (inzip (x y) link)
         (inzip (y1 z) link)
         (equal y y1)))
+
+(setq p1x
+      (bincomp link link))
 
 ;; fix union
 (union link p1x)
@@ -456,21 +466,21 @@
           collect result))
 
 
-(defun binary-composition (function list-rx list-ry list-sy list-sz)
-  "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
-  (compr (cons x z)
-    (in (x y1) list-rx list-ry)
-    (in (y2 z) list-sy list-sz)
-    (equal y1 y2)))
+;; (defun binary-composition (function list-rx list-ry list-sy list-sz)
+;;   "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
+;;   (compr (cons x z)
+;;     (in (x y1) list-rx list-ry)
+;;     (in (y2 z) list-sy list-sz)
+;;     (equal y1 y2)))
 
-(defun bincomp (list-rx list-ry list-sy list-sz)
-  "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
-  (binary-composition #'cons list-rx list-ry list-sy list-sz))
+;; (defun bincomp (list-rx list-ry list-sy list-sz)
+;;   "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
+;;   (binary-composition #'cons list-rx list-ry list-sy list-sz))
 
-(bincomp '(a b c d e)
-         '(1 2 3 4 5)
-         '(3 7 2 6 4)
-         '(v w x y z))
+;; (bincomp '(a b c d e)
+;;          '(1 2 3 4 5)
+;;          '(3 7 2 6 4)
+;;          '(v w x y z))
 
 
 (defun union-plist (plist1 plist2)
@@ -751,3 +761,7 @@
 ;; (find-fact query-to-rule (tables *sample-db*))
 
 
+
+
+
+;; newwwwww
