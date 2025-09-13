@@ -37,6 +37,7 @@
   (cons x nil))
 
 (defun id-list (x)
+  "a | (a) -> (a)"
   (if (not (listp x))
       (pure x)
       x))
@@ -159,9 +160,11 @@
         (inzip (x y) link)
         (inzip (y1 z) link)
         (equal y y1)))
+;; ((A C) (B C) (B D) (C C) (C D))
 
 (setq p1x
       (bincomp link link))
+;; ((A C) (B C) (B D) (C C) (C D))
 
 ;; fix union
 (union link p1x)
@@ -173,6 +176,94 @@
 
 (setq p1 (lunion link p1x))
 
+
+
+;; (defun bc-quals (quals)
+;;   (let ((existing-vars nil)
+;;         (new-quals nil))
+;;     (loop for qual in quals
+;;           for qvars = (id-list (second qual))
+          
+;;     )))
+
+;; if var not in existing-vars:
+;;   (list qual (cons var existing-vars)
+;; else:
+;;   (list (
+
+;; (defun bc-qual (qual &optional existing-vars new-quals)
+;;   (let ((vars (id-list (second qual))))
+
+;;     )
+;;   )
+
+;; (defun bc-quals (quals &optional existing-vars new-quals same-qual)
+;;   (let* ((qual (car quals))
+;;          (vars (id-list (second qual)))
+;;          )
+;;     (if (null quals)
+;;         new-quals
+;;         ()
+;;         )))
+
+(defun bc-quals (quals &optional new-quals existing-vars)
+  "formatting quals in compr for binary composition"
+  ;; what a shitty code
+  (loop for qual in quals
+        for aquals = nil 
+        for variables = (id-list (second qual))
+        for vars = variables
+        for new-qual = qual
+        when (or (symbol= (car qual) 'in)
+                 (symbol= (car qual) 'inzip))
+          do (progn
+               ;; (print (or (symbol= (car qual) 'inzip)
+               ;;            (symbol= (car qual) 'inzip)))
+               (loop for i upto (- (length variables) 1)
+                     for var = (nth i variables)
+                     do (if (not (member var existing-vars))
+                            (push var existing-vars)
+                            (let ((new-var (gensym)))
+                              (progn
+                                (setf (nth i vars) new-var)
+                                (push `(equal ,var ,new-var) aquals)))))
+               (setf (second new-qual) vars))
+        do (setf new-quals (append new-quals (cons new-qual (reverse aquals))))
+        finally (return new-quals)))
+
+(bc-quals '((in x '(1 2 3))
+            (inzip (x y) '((1 2) (3 4)))
+            )
+          )
+
+(compr (cons x y)
+  (in x '(1 2 3 4 5))
+  (in y '(4 5 6 7 8))
+  (equal x y)
+  (equal x 5))
+
+(setq aaa '(1 2 3))
+(setf aaa (append aaa '(4 5 6)))
+
+(defmacro compr-bc (exp &body quals)
+  "compr with built-in binary composition matching"
+  `(compr ,exp ,@(bc-quals quals)))
+
+(compr x
+  (in x '(1 2))
+  (in x '(2 3)))
+
+(compr-bc x
+  (in x '(1 2))
+  (in x '(2 3)))
+
+(setq p1x
+      (compr-bc (list x z)
+        (inzip (x y) link)
+        (inzip (y z) link)))
+;; ((A C) (B C) (B D) (C C) (C D))
+
+(setq p1 (lunion link p1x))
 
 ;; (defun dumb-function (x y z) (+ x y z))
 
