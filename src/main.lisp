@@ -222,9 +222,8 @@
                      do (if (not (member var existing-vars))
                             (push var existing-vars)
                             (let ((new-var (gensym)))
-                              (progn
-                                (setf (nth i vars) new-var)
-                                (push `(equal ,var ,new-var) aquals)))))
+                              (setf (nth i vars) new-var)
+                              (push `(equal ,var ,new-var) aquals))))
                (setf (second new-qual) vars))
         do (setf new-quals (append new-quals
                                    (cons new-qual (reverse aquals))))
