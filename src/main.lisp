@@ -37,7 +37,7 @@
   (cons x nil))
 
 (defun id-list (x)
-  "a | (a) -> (a)"
+  "a | list a -> list a"
   (if (not (listp x))
       (pure x)
       x))
@@ -217,8 +217,6 @@
         when (or (symbol= (car qual) 'in)
                  (symbol= (car qual) 'inzip))
           do (progn
-               ;; (print (or (symbol= (car qual) 'inzip)
-               ;;            (symbol= (car qual) 'inzip)))
                (loop for i upto (- (length variables) 1)
                      for var = (nth i variables)
                      do (if (not (member var existing-vars))
@@ -228,11 +226,12 @@
                                 (setf (nth i vars) new-var)
                                 (push `(equal ,var ,new-var) aquals)))))
                (setf (second new-qual) vars))
-        do (setf new-quals (append new-quals (cons new-qual (reverse aquals))))
+        do (setf new-quals (append new-quals
+                                   (cons new-qual (reverse aquals))))
         finally (return new-quals)))
 
-(bc-quals '((in x '(1 2 3))
-            (inzip (x y) '((1 2) (3 4)))
+(bc-quals '((in (x y) '(1 2 3))
+            (inzip (y z) '((1 2) (3 4)))
             )
           )
 
@@ -250,12 +249,12 @@
   `(compr ,exp ,@(bc-quals quals)))
 
 (compr x
-  (in x '(1 2))
-  (in x '(2 3)))
+  (in x '(1 2 3))
+  (in x '(2 3 4)))
 
 (compr-bc x
-  (in x '(1 2))
-  (in x '(2 3)))
+  (in x '(1 2 3))
+  (in x '(2 3 4)))
 
 (setq p1x
       (compr-bc (list x z)
@@ -264,6 +263,55 @@
 ;; ((A C) (B C) (B D) (C C) (C D))
 
 (setq p1 (lunion link p1x))
+
+
+(defun patmatch-atom (atom pattern)
+  (equal atom pattern))
+
+(defun patmatch-cons (cons pattern))
+
+(defun patmatch (x pattern)
+  )
+
+
+(defun pm-quals (quals &optional new-quals)
+  "formatting quals in compr for pattern matching"
+  (loop for qual in quals
+        for aquals = nil
+        for variables = (id-list (second qual))
+        for vars = variables
+        for new-qual = qual
+        when (or (symbol= (car qual) 'in)
+                 (symbol= (car qual) 'inzip))
+          do (progn
+               (loop for i upto (- (length variables) 1)
+                     for var = (nth i variables)
+                     do (if (not (lambdavar-p var))
+                            (let ((new-var (gensym)))
+                              (setf (nth i vars) new-var)
+                              (push `(equal ,new-var ,var) aquals))))
+               (setf (second new-qual) vars))
+        do (setf new-quals (append new-quals (cons new-qual (reverse aquals))))
+        finally (return new-quals)))
+
+(pm-quals '(
+            (in x '(1 2 3))
+            (in (1 x) '(1 2 3))
+            ))
+
+(defmacro compr-pm (exp &body quals)
+  "compr with built-in primitive (non-recursive) pattern matching"
+  `(compr ,exp ,@(pm-quals (bc-quals quals))))
+
+(compr x
+  (inzip (x y) '((1 1) (2 2) (3 1)))
+  (equal y 1))
+;; (1 3)
+
+(compr-pm x
+  (inzip (x 1) '((1 1) (2 2) (3 1))))
+;; (1 3)
+
 
 ;; (defun dumb-function (x y z) (+ x y z))
 
