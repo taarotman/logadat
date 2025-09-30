@@ -2,6 +2,12 @@
   (:use :cl))
 (in-package :logadat-db)
 
+;; <program>   ::= <rule> <program> | ""
+;; <rule>      ::= <atom> ":-" <atom-list> "."
+;; <atom-list> ::= <atom> | <atom> "," <atom-list> | ""
+;; <atom>      ::= <relation> "(" <term-list> ")"
+;; <term-list> ::= <term> | <term> "," <term-list> | ""
+;; <term>      ::= <constant> | <variable>
 
 ;; (defclass table ()
 ;;   ((name :accessor name :initarg :name)
@@ -149,36 +155,52 @@
 ;;                            value type name))))
 
 
+(defclass datom ()
+  ((relation
+    :reader relation
+    :initarg :relation)
+   (term-list
+    :reader term-list
+    :initarg :term-list)))
+
 (defclass rule ()
-  ((name
-    :reader name
-    :initarg :name)
-   (head ;; terms
+  ((head ;; head atom
     :reader head
     :initarg :head)
-   (body ;; list of rules
+   (body ;; body list of atoms
     :reader body
     :initarg :body)))
 
-;; a rule without a body is a fact - atom (datom)
+;; (defclass rule ()
+;;   ((name
+;;     :reader name
+;;     :initarg :name)
+;;    (head ;; terms
+;;     :reader head
+;;     :initarg :head)
+;;    (body ;; list of rules
+;;     :reader body
+;;     :initarg :body)))
 
-(defun make-rule (name head &optional body)
-  (make-instance
-   'rule
-   :name name
-   :head head
-   :body body))
+;; ;; a rule without a body is a fact - atom (datom)
 
-(setq rule1
-      (make-rule :rule-name '(?x ?y)
-        '((:rule-name2 (?x ?c ?z)) (:rule-name (?z ?y)))))
-(head rule1)
-(body rule1)
+;; (defun make-rule (name head &optional body)
+;;   (make-instance
+;;    'rule
+;;    :name name
+;;    :head head
+;;    :body body))
 
-(setq rule2
-      (make-rule :rule-name '(?x ?y)))
-(head rule2)
-(body rule2)
+;; (setq rule1
+;;       (make-rule :rule-name '(?x ?y)
+;;         '((:rule-name2 (?x ?c ?z)) (:rule-name (?z ?y)))))
+;; (head rule1)
+;; (body rule1)
+
+;; (setq rule2
+;;       (make-rule :rule-name '(?x ?y)))
+;; (head rule2)
+;; (body rule2)
 
 
 (defmacro mk-rule (name head &body body)

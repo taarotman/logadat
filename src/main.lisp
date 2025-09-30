@@ -67,7 +67,8 @@
 (defun lambdavar-p (x)
   "Can X be a lambda variable?"
   (symbolp-r x
-    (not (fboundp x))
+    (not (boundp x))
+    ;;(not (fboundp x))
     (both-case-p (char (symbol-name x) 0))))
 
 ;; (defmacro id-var (symbol list)
@@ -311,6 +312,12 @@
   (inzip (x 1) '((1 1) (2 2) (3 1))))
 ;; (1 3)
 
+(setq aaa "aaa")
+
+(lambdavar-p 'aaa)
+
+(compr-pm x
+  (in (x aaa) '(1 2 3) '("aaa" "aaa" "ccc")))
 
 ;; (defun dumb-function (x y z) (+ x y z))
 
@@ -732,34 +739,34 @@
 
 ;; (defun walk-body (body bindings-tables))
 
-(defun tables-to-grounds (tables)
-  "tables - list (name X schema X list row) -> facts - list (name X row)"
-  (compr (make-rule (name table) (pure p))
-    (in table tables)
-    (in p (rows table))))
+;; (defun tables-to-grounds (tables)
+;;   "tables - list (name X schema X list row) -> facts - list (name X row)"
+;;   (compr (make-rule (name table) (pure p))
+;;     (in table tables)
+;;     (in p (rows table))))
 
-(setq table1
-      (mk-table :table1 (:v1 :colour :v2)
-        (1 red 2)
-        (2 blue 1)
-        (2 green 3)
-        (1 blue 4)
-        (3 red 4)
-        (4 yellow 5)))
-(rows table1)
+;; (setq table1
+;;       (mk-table :table1 (:v1 :colour :v2)
+;;         (1 red 2)
+;;         (2 blue 1)
+;;         (2 green 3)
+;;         (1 blue 4)
+;;         (3 red 4)
+;;         (4 yellow 5)))
+;; (rows table1)
 
-(compr (cons (name i) (head i))
-  (in i (tables-to-grounds (pure table1))))
+;; (compr (cons (name i) (head i))
+;;   (in i (tables-to-grounds (pure table1))))
 
 
-(defun eval-grounds0 (terms table)
-  "terms -> table -> name X list substitution"
-  (compr (cons (name table) f)
-    (in row (rows table))
-    (in f (pure (unify terms row)))
-    (identity f)))
+;; (defun eval-grounds0 (terms table)
+;;   "terms -> table -> name X list substitution"
+;;   (compr (cons (name table) f)
+;;     (in row (rows table))
+;;     (in f (pure (unify terms row)))
+;;     (identity f)))
 
-(setq subst1 (eval-grounds0 '(?x ?c ?y) table1))
+;; (setq subst1 (eval-grounds0 '(?x ?c ?y) table1))
 
 
 ;; if variable
@@ -769,31 +776,31 @@
 
 ;; if not then 
 
-(defun esrow (name head subst-row)
-  (compr
-      (if )
-    (in term head)
-    (in st (cdr subst-row))
-    ))
+;; (defun esrow (name head subst-row)
+;;   (compr
+;;       (if )
+;;     (in term head)
+;;     (in st (cdr subst-row))
+;;     ))
 
-(defun eval-grounds1 (name head substitutions)
-  ;; (bind
-  ;;  substitutions
-  ;;  (lambda (subst)
-  ;;    (if (string= name (car subst))
-  ;;        (pure subst))))
-  (compr srow
-    (in subst substitutions)
-    (in srow (cdr subst))
-    ))
+;; (defun eval-grounds1 (name head substitutions)
+;;   ;; (bind
+;;   ;;  substitutions
+;;   ;;  (lambda (subst)
+;;   ;;    (if (string= name (car subst))
+;;   ;;        (pure subst))))
+;;   (compr srow
+;;     (in subst substitutions)
+;;     (in srow (cdr subst))
+;;     ))
 
-(setq subst2 (eval-grounds1 :r1 '(?x ?y) subst1))
+;; (setq subst2 (eval-grounds1 :r1 '(?x ?y) subst1))
 
 
-(setq rule1
-      (mk-rule :rule1 (?x ?y)
-        (:table1 (?x ?c ?y))))
-(body rule1)
+;; (setq rule1
+;;       (mk-rule :rule1 (?x ?y)
+;;         (:table1 (?x ?c ?y))))
+;; (body rule1)
 
 
 ;; (defun delta-init (idb edb)
