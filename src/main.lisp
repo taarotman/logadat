@@ -437,10 +437,12 @@
               (setf (rule-list (pred rule)) (cons (head-and-body rule)
                                                   (rule-list (pred rule))))
               (error "Predicate ~S must have the same head lengths" (first rule)))
-          (setf (gethash (first rule) preds)
-                (make-instance 'predicate
-                               :term-length (length (second rule))
-                               :rule-list (pure (head-and-body rule))))))
+          (if (symbolp (first rule))
+              (setf (gethash (first rule) preds)
+                    (make-instance 'predicate
+                                   :term-length (length (second rule))
+                                   :rule-list (pure (head-and-body rule))))
+              (error "Predicate name ~S is not a symbol" (first rule)))))
     preds))
 
 (setq colpreds
