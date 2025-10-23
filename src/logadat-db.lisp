@@ -135,12 +135,12 @@
 ;;                     (error "~S is not of type ~S for column ~S"
 ;;                            value type name))))
 
-(defun insert-row (table values)
-  (push (validate-row (schema table) values) (rows table)))
+;; (defun insert-row (table values)
+;;   (push (validate-row (schema table) values) (rows table)))
 
-(defun insert-rows (table &rest rows)
-  (dolist (r rows table)
-    (insert-row table r)))
+;; (defun insert-rows (table &rest rows)
+;;   (dolist (r rows table)
+;;     (insert-row table r)))
 
 
 ;; (defun validate-terms-from-schema (schema terms)
@@ -164,12 +164,38 @@
     :initarg :term-list)))
 
 (defclass rule ()
-  ((head ;; head atom
+  ((name ;; name of head atom
+    :reader name
+    :initarg :name)
+   (head ;; body of head atom
     :reader head
     :initarg :head)
-   (body ;; body list of atoms
+   (body ;; list of body atoms / boolean quals
     :reader body
     :initarg :body)))
+
+(defclass grounds ()
+  ((name
+    :reader name
+    :initarg :name)
+   (ground-atoms ;; represented as a list of lists
+    :reader ground-atoms
+    :initarg :ground-atoms)))
+
+
+(defun mk-datom (relation term-list)
+  (make-instance
+   'datom
+   :relation relation
+   :term-list term-list))
+
+(defun mk-rule (name head body)
+  (make-instance
+   'rule
+   :name name
+   :head head
+   :body body ;;mapcar
+   ))
 
 ;; (defclass rule ()
 ;;   ((name
@@ -203,8 +229,8 @@
 ;; (body rule2)
 
 
-(defmacro mk-rule (name head &body body)
-  `(make-rule ,name ',head ',body))
+;; (defmacro mk-rule (name head &body body)
+;;   `(make-rule ,name ',head ',body))
 
 
 ;; (defun make-fact (name head)
@@ -268,22 +294,22 @@
 
 
 ;; rule (:name head body
-(defclass database ()
-  ((name
-    :reader name
-    :initarg :name)
-   (tables
-    :accessor tables
-    :initarg :tables
-    :initform nil)
-   (rules
-    :accessor rules
-    :initarg :rules
-    :initform nil)))
+;; (defclass database ()
+;;   ((name
+;;     :reader name
+;;     :initarg :name)
+;;    (facts
+;;     :accessor facts
+;;     :initarg :facts
+;;     :initform nil)
+;;    (rules
+;;     :accessor rules
+;;     :initarg :rules
+;;     :initform nil)))
 
 
-(defun ins-table (db table)
-  (push table (tables db)))
+;; (defun ins-table (db table)
+;;   (push table (tables db)))
 
-(defun ins-rule (db rule)
-  (push rule (rules db)))
+;; (defun ins-rule (db rule)
+;;   (push rule (rules db)))

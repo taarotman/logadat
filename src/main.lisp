@@ -175,8 +175,25 @@
   "union but with equal instead"
   (union list1 list2 :test #'equal))
 
+(defun lintersection (list1 list2)
+  "intersection but with equal instead"
+  (intersection list1 list2 :test #'equal))
+
+(defun ldifference (list1 list2)
+  "set-difference but with equal instead"
+  (set-difference list1 list2 :test #'equal))
+
 (setq p1 (lunion link p1x))
 
+
+(defun lunions (&rest rlist)
+  (reduce #'lunion rlist))
+
+(defun lintersections (&rest rlist)
+  (reduce #'lintersection rlist))
+
+(defun ldifferences (&rest rlist)
+  (reduce #'ldifference rlist))
 
 
 ;; (defun bc-quals (quals)
@@ -353,7 +370,116 @@
 
 ;; [(a,b,c), (d,e,f)] -> [(a,d), (b,e) (c,f)]
 ;; (ziplist dumb-list)
+(subsetp '((1 2) (3 4)) '((1 2) (3 4) (5 6)) :test #'equal)
 
+(defun lsubsetp (list1 list2)
+  "subsetp but with equal instead"
+  (subsetp list1 list2 :test #'equal))
+
+(lsubsetp '((1 2) (3 4)) '((1 2) (3 4) (5 6)))
+
+
+(defun naive-ex1 (edge)
+  (let ((path (compr-pm (list x y) (inzip (x y) edge))))
+    (loop while t
+          for newpath = (compr-pm (list x z)
+                          (inzip (x y) edge)
+                          (inzip (y z) path))
+          do (print path)
+          if (lsubsetp newpath path)
+            return path
+          else
+            do (setf path (lunion path newpath)))))
+
+(defun seminaive-ex1 (edge)
+  (let* ((path (compr-pm (list x y) (inzip (x y) edge)))
+         (deltapath path))
+    (loop while t
+          for newpath = (compr-pm (list x z)
+                          (inzip (x y) edge)
+                          (inzip (y z) deltapath))
+          do (print deltapath)
+          if (lsubsetp newpath path)
+            return path
+          else
+            do (progn
+                 (setf deltapath (ldifference newpath path))
+                 (setf path (lunion path newpath))))))
+
+(setq edge '((1 2) (2 3) (3 4)))
+(setq nex1 (naive-ex1 edge))
+(setq snex1 (seminaive-ex1 edge))
+(lintersection nex1 snex1)
+(ldifference nex1 snex1)
+
+
+
+
+(defclass predicate ()
+  ((term-length
+    :reader term-length
+    :initarg :term-length)
+   (rule-list
+    :accessor rule-list
+    :initarg :rule-list)))
+
+(defun ico-rules (&rest idb)
+
+  )
+
+(defun collect-preds (idb &optional preds)
+  (labels ((pos (r) (gethash (first r) preds))
+           (pred (r) (nth-value 0 (pos r)))
+           (head-and-body (r) (cons (second r) (cddr r))))
+    (dolist (rule idb)
+      (if (nth-value 1 (pos rule))
+          (if (= (length (second rule)) (term-length (pred rule)))
+              (setf (rule-list (pred rule)) (cons (head-and-body rule)
+                                                  (rule-list (pred rule))))
+              (error "Predicate ~S must have the same head lengths" (first rule)))
+          (setf (gethash (first rule) preds)
+                (make-instance 'predicate
+                               :term-length (length (second rule))
+                               :rule-list (pure (head-and-body rule))))))
+    preds))
+
+(setq colpreds
+      (collect-preds '(
+                       (t (x y)
+                        (in (x z) t)
+                        (in (z y) r))
+                       (t (x y)
+                        (in (x y) r))
+                       (r (x y z)
+                        (in (x y z) r))
+                       )
+                     (make-hash-table)))
+
+(rule-list (nth-value 0 (gethash 't colpreds))) 
+(rule-list (nth-value 0 (gethash 'r colpreds))) 
+
+(defmacro rule-to-compr (head &body body)
+  `(compr-pm (list ,@head)
+     ,@(to-inzip body)))
+
+(defun to-inzip (predicates)
+  (forc
+   (in pred predicates)
+   (if (not (symbol= (first pred) 'in))
+       pred
+       `(inzip ,(second pred) ,(third pred)))))
+
+(to-inzip '((in 12 '(1 2 12)) (= 5 5)))
+
+(rule-to-compr (x y)
+  (in (x z) '((1 2) (3 4)))
+  (in (z y) '((1 1) (2 2))))
+
+
+
+
+;; (compr '(x y)
+;;   (in (x y) '(1 2 3) '(4 5 6)))
 
 
 ;; variable processing
@@ -679,24 +805,24 @@
                       (:deptname "Production" :manager "Charles"))))
 
 
-(defun eval-table (terms table)
-  (mapnonnil #'(lambda (row)
-                 (unify-row terms row))
-             (rows table)))
+;; (defun eval-table (terms table)
+;;   (mapnonnil #'(lambda (row)
+;;                  (unify-row terms row))
+;;              (rows table)))
 
-(defun eval-rule (db rule)
-  (let ((tables (tables db))
-        (rules  (rules db)))
-    ))
+;; (defun eval-rule (db rule)
+;;   (let ((tables (tables db))
+;;         (rules  (rules db)))
+;;     ))
 
 
 
-(defun fix (function &optional value)
-  "Repeatedly apply 'function' until value equals value applied to function"
-  (let ((next (funcall function value)))
-    (if (equal value next)
-        value
-        (fix function next))))
+;; (defun fix (function &optional value)
+;;   "Repeatedly apply 'function' until value equals value applied to function"
+;;   (let ((next (funcall function value)))
+;;     (if (equal value next)
+;;         value
+;;         (fix function next))))
 
 ;; (defun fac (f)
 ;;   (lambda (n)
@@ -704,7 +830,7 @@
 ;;       (0 1)
 ;;       (t (* n (funcall f (- n 1)))))))
 
-(setq fix-test (fix (lambda (x) (+ 5)) 1))
+;; (setq fix-test (fix (lambda (x) (+ 5)) 1))
 
 ;; (defun fact (n) (fix (lambda (x) (fac x)) n))
 
@@ -816,10 +942,10 @@
 ;;  '((1 2 3) (4 5 6)))
 
 ;; before evaluating a query, evaluate the entire program first
-(defun eval-db (idb &optional edb bindings-db)
-  "semi-naive evaluation"
-  (let ()
-    ))
+;; (defun eval-db (idb &optional edb bindings-db)
+;;   "semi-naive evaluation"
+;;   (let ()
+;;     ))
 
 
 ;; printing
