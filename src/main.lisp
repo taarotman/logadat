@@ -26,6 +26,15 @@
 (defmacro alias (fn to)
   `(setf (fdefinition ',to) #',fn))
 
+(defun map-hashtbl (function hashtbl)
+  (let ((new-hashtbl (make-hash-table)))
+    (maphash #'(lambda (k v)
+                 (setf (gethash k new-hashtbl) (funcall function v)))
+             hashtbl)
+    new-hashtbl))
+
+
+
 (alias mapcan mappend)
 
 (defun bind (list function)
@@ -421,7 +430,11 @@
     :initarg :term-length)
    (rule-list
     :accessor rule-list
-    :initarg :rule-list)))
+    :initarg :rule-list)
+   (current-value
+    :accessor current-value
+    :initarg :current-value
+    :initform nil)))
 
 (defun ico-rules (&rest idb)
 
@@ -436,7 +449,8 @@
           (if (= (length (second rule)) (term-length (pred rule)))
               (setf (rule-list (pred rule)) (cons (head-and-body rule)
                                                   (rule-list (pred rule))))
-              (error "Predicate ~S must have the same head lengths" (first rule)))
+              (error "Rules of predicate ~S must have the same head length"
+                     (first rule)))
           (if (symbolp (first rule))
               (setf (gethash (first rule) preds)
                     (make-instance 'predicate
@@ -460,7 +474,48 @@
 (rule-list (nth-value 0 (gethash 't colpreds))) 
 (rule-list (nth-value 0 (gethash 'r colpreds))) 
 
-(defmacro rule-to-compr (head &body body)
+(defun rewrite-preds-rules (predicates edb)
+  (flet ((rewrite-rules (rules)
+           (compr (cons (car r) (rewrite-atoms (cdr r) predicates edb))
+             (in r rules))))
+    (map-hashtbl #'(lambda (p) (make-instance
+                                'predicate
+                                :term-length (term-length p)
+                                :rule-list (rewrite-rules (rule-list p))
+                                :current-value (current-value p)))
+                 predicates)))
+
+(defun rewrite-atoms (rule-body predicates edb)
+  (forc
+   (in datom rule-body)
+   (cond
+     ((nth-value 1 (gethash (third datom) predicates))
+      `(in ,(second datom)
+           ,(current-value (nth-value 0 (gethash (third datom) predicates)))))
+     ((nth-value 1 (gethash (third datom) edb))
+      `(in ,(second datom)
+           ,(nth-value 0 (gethash (third datom) predicates))))
+     (t (error "~S not found in database" (third datom))))))
+
+(setq colpreds2
+      (rewrite-preds-rules colpreds (make-hash-table))) 
+
+(rule-list (nth-value 0 (gethash 't colpreds2))) 
+(rule-list (nth-value 0 (gethash 'r colpreds2))) 
+
+;; (rewrite-atoms '((in (x y) r)) colpreds (make-hash-table))
+
+;; (mapcar #'(lambda (x) (+ 1 (car x))) '((1 a) (2 b)))
+
+(defun eval-preds (predicates)
+  (map-hashtbl #'(lambda (p) (eval-predicate p)) predicates))
+
+(defun eval-predicate (predicate)
+  (reduce #'lunion
+          (mapcar #'(lambda (r) (rule-to-compr (car r) (cdr r)))
+                  (rule-list predicate))))
+
+(defmacro rule-to-compr (head body)
   `(compr-pm (list ,@head)
      ,@(to-inzip body)))
 
@@ -473,9 +528,9 @@
 
 (to-inzip '((in 12 '(1 2 12)) (= 5 5)))
 
-(rule-to-compr (x y)
-  (in (x z) '((1 2) (3 4)))
-  (in (z y) '((1 1) (2 2))))
+;; (rule-to-compr (x y)
+;;   (in (x z) '((1 2) (3 4)))
+;;   (in (z y) '((1 1) (2 2))))
 
 
 
