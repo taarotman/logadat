@@ -431,13 +431,24 @@
    (rule-list
     :accessor rule-list
     :initarg :rule-list)
+   (rules-rewrite
+    :accessor rules-rewrite
+    :initarg :rules-rewrite
+    :initform nil)
    (current-value
     :accessor current-value
     :initarg :current-value
     :initform nil)))
 
-(defun ico-rules (&rest idb)
+(defmacro rules (&body rules)
+  `(collect-preds ',rules (make-hash-table)))
 
+(defmacro facts (&body facts)
+  (let (
+        ()
+        )
+
+    )
   )
 
 (defun collect-preds (idb &optional preds)
@@ -460,16 +471,14 @@
     preds))
 
 (setq colpreds
-      (collect-preds '(
-                       (t (x y)
-                        (in (x z) t)
-                        (in (z y) r))
-                       (t (x y)
-                        (in (x y) r))
-                       (r (x y z)
-                        (in (x y z) r))
-                       )
-                     (make-hash-table)))
+      (rules
+        (t (x y)
+           (in (x z) t)
+           (in (z y) r))
+        (t (x y)
+           (in (x y) r))
+        (r (x y z)
+           (in (x y z) r))))
 
 (rule-list (nth-value 0 (gethash 't colpreds))) 
 (rule-list (nth-value 0 (gethash 'r colpreds))) 
@@ -481,7 +490,8 @@
     (map-hashtbl #'(lambda (p) (make-instance
                                 'predicate
                                 :term-length (term-length p)
-                                :rule-list (rewrite-rules (rule-list p))
+                                :rule-list (rule-list p)
+                                :rules-rewrite (rewrite-rules (rule-list p))
                                 :current-value (current-value p)))
                  predicates)))
 
@@ -500,8 +510,9 @@
 (setq colpreds2
       (rewrite-preds-rules colpreds (make-hash-table))) 
 
-(rule-list (nth-value 0 (gethash 't colpreds2))) 
+(rules-rewrite (nth-value 0 (gethash 't colpreds2))) 
 (rule-list (nth-value 0 (gethash 'r colpreds2))) 
+
 
 ;; (rewrite-atoms '((in (x y) r)) colpreds (make-hash-table))
 
@@ -531,6 +542,11 @@
 ;; (rule-to-compr (x y)
 ;;   (in (x z) '((1 2) (3 4)))
 ;;   (in (z y) '((1 1) (2 2))))
+
+
+(defun naive-evaluation (idb edb)
+
+  )
 
 
 
