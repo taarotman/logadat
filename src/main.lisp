@@ -519,12 +519,19 @@
 ;; (mapcar #'(lambda (x) (+ 1 (car x))) '((1 a) (2 b)))
 
 (defun eval-preds (predicates)
-  (map-hashtbl #'(lambda (p) (eval-predicate p)) predicates))
+  (map-hashtbl #'(lambda (p)
+                   (make-instance
+                    'predicate
+                    :term-length (term-length p)
+                    :rule-list (rule-list p)
+                    :rules-rewrite (rules-rewrite p)
+                    :current-value (eval-predicate (rules-rewrite p))))
+               predicates))
 
-(defun eval-predicate (predicate)
+(defun eval-rules (rules)
   (reduce #'lunion
           (mapcar #'(lambda (r) (rule-to-compr (car r) (cdr r)))
-                  (rule-list predicate))))
+                  rules)))
 
 (defmacro rule-to-compr (head body)
   `(compr-pm (list ,@head)
