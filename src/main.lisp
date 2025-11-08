@@ -1,11 +1,11 @@
 ;; (require "DATABASE" "logadat-db")
-(load "logadat-db.lisp")
+;; (load "logadat-db.lisp")
 
-(defpackage :logadat
-  (:use :cl
-        :logadat-db))
-(in-package :logadat)
-(in-package :logadat-db)
+;; (defpackage :logadat
+;;   (:use :cl
+;;         :logadat-db))
+;; (in-package :logadat)
+;; (in-package :logadat-db)
 
 ;; (use-package cl-logadat-db)
 
@@ -425,7 +425,10 @@
 
 
 (defclass predicate ()
-  ((term-length
+  ((pred-name
+    :reader pred-name
+    :initarg :pred-name)
+   (term-length
     :reader term-length
     :initarg :term-length)
    (rule-list
@@ -443,13 +446,12 @@
 (defmacro rules (&body rules)
   `(collect-preds ',rules (make-hash-table)))
 
-(defmacro facts (&body facts)
-  (let (
-        ()
-        )
-
-    )
-  )
+;; (defmacro facts (&body facts)
+;;   (let ((fact-table (make-hash-table)))
+;;     (forc
+;;      (in afact facts)
+;;      (in fact (cdr afact))
+;;      )))
 
 (defun collect-preds (idb &optional preds)
   (labels ((pos (r) (gethash (first r) preds))
@@ -465,23 +467,46 @@
           (if (symbolp (first rule))
               (setf (gethash (first rule) preds)
                     (make-instance 'predicate
+                                   :pred-name (first rule)
                                    :term-length (length (second rule))
                                    :rule-list (pure (head-and-body rule))))
               (error "Predicate name ~S is not a symbol" (first rule)))))
     preds))
 
-(setq colpreds
-      (rules
-        (t (x y)
-           (in (x z) t)
-           (in (z y) r))
-        (t (x y)
-           (in (x y) r))
-        (r (x y z)
-           (in (x y z) r))))
+;; (r '((1 2) (3 4)))
 
-(rule-list (nth-value 0 (gethash 't colpreds))) 
-(rule-list (nth-value 0 (gethash 'r colpreds))) 
+(defmacro facts (&body facts)
+  `(collect-facts ',facts (make-hash-table)))
+
+(defun collect-facts (edb &optional facts)
+  (forc
+   (in fact edb)
+   (setf (gethash (first fact) facts)
+         (validate-fact fact)))
+  facts)
+
+(defun validate-fact (fact &optional fact-length)
+  (forc
+   (in body (cdr fact))
+   (if (null fact-length)
+       (progn
+         (setf fact-length (length body))
+         body)
+       (if (= (length body) fact-length)
+           body
+           (error "Fact ~S contains a body length (~S) mismatch from ~S" (cdr fact) fact-length body)))))
+
+
+(validate-fact
+ '(t (1 2) (3 4)))
+
+(facts
+  (t (1 2) (3 4))
+  (r (1 2 3) (4 5 6) (7 8 9)))
+
+;; (compr (if (not (= x 3)) x (error "no"))
+;;   (in x '(1 2 3)))
+
 
 (defun rewrite-preds-rules (predicates edb)
   (flet ((rewrite-rules (rules)
@@ -489,6 +514,7 @@
              (in r rules))))
     (map-hashtbl #'(lambda (p) (make-instance
                                 'predicate
+                                :pred-name (pred-name p)
                                 :term-length (term-length p)
                                 :rule-list (rule-list p)
                                 :rules-rewrite (rewrite-rules (rule-list p))
@@ -507,11 +533,6 @@
            ,(nth-value 0 (gethash (third datom) predicates))))
      (t (error "~S not found in database" (third datom))))))
 
-(setq colpreds2
-      (rewrite-preds-rules colpreds (make-hash-table))) 
-
-(rules-rewrite (nth-value 0 (gethash 't colpreds2))) 
-(rule-list (nth-value 0 (gethash 'r colpreds2))) 
 
 
 ;; (rewrite-atoms '((in (x y) r)) colpreds (make-hash-table))
@@ -522,20 +543,25 @@
   (map-hashtbl #'(lambda (p)
                    (make-instance
                     'predicate
+                    :pred-name (pred-name p)
                     :term-length (term-length p)
                     :rule-list (rule-list p)
                     :rules-rewrite (rules-rewrite p)
-                    :current-value (eval-predicate (rules-rewrite p))))
+                    :current-value (eval-rules (rules-rewrite p))))
                predicates))
 
-(defun eval-rules (rules)
-  (reduce #'lunion
-          (mapcar #'(lambda (r) (rule-to-compr (car r) (cdr r)))
-                  rules)))
 
-(defmacro rule-to-compr (head body)
+;; (defmacro rule-to-compr (head &body body)
+;;   `(compr-pm (list ,@head)
+;;      ,@(to-inzip body)))
+
+(defun rule-to-compr (rule)
+  (eval (rule-compr-gen (car rule) (cdr rule))))
+
+(defun rule-compr-gen (head body)
   `(compr-pm (list ,@head)
      ,@(to-inzip body)))
+
 
 (defun to-inzip (predicates)
   (forc
@@ -546,573 +572,675 @@
 
 (to-inzip '((in 12 '(1 2 12)) (= 5 5)))
 
-;; (rule-to-compr (x y)
-;;   (in (x z) '((1 2) (3 4)))
-;;   (in (z y) '((1 1) (2 2))))
+(setq head '(x y))
+(setq body '(in (x y) '((1 2) (3 4))))
 
+(setq gentest (rule-to-compr (cons head (list body))))
+
+;; (defmacro rule-to-compr2 (head body)
+;;   `(rule-to-compr ,head ,@body))
+
+;; (defmacro rule-to-compr-f (rule)
+;;   `(rule-to-compr ,(car rule) ,@(cdr rule)))
+
+;; https://stackoverflow.com/questions/15669675/evaluate-the-arguments-of-a-macro-form
+;; (defun rule-to-compr-fun (rule)
+;;   (funcall (compile nil `(lambda () (rule-to-compr-f ,rule)))))
+
+;; (defun eval-rules (rules)
+;;   ;; wtf
+;;   (let ((lambdasym (gensym))
+;;         )
+;;     (declare (special lambdasym))
+;;     (eval
+;;      `(reduce #'lunion
+;;               (mapcar #'(lambda (,lambdasym) (eval (rule-to-compr-full ,lambdasym)))
+;;                       ',rules)))))
+
+(defun eval-rules (rules)
+  (reduce #'lunion
+          (mapcar #'rule-to-compr
+                  rules)))
+
+;; (rule-to-compr2 (x y)
+;;                 ((in (x z) '((1 2) (3 4)))
+;;                  (in (z y) '((1 1) (2 2)))))
+
+
+(setq r '(1 2 3))
+;; (eval `(apply #'+ ',r))
+
+(defun predicate= (pred1 pred2)
+  (map-hashtbl
+   #'(lambda (p)
+       (equal (current-value p)
+              (current-value (nth-value 0 (gethash (pred-name p) pred2)))))
+   pred1))
 
 (defun naive-evaluation (idb edb)
+  (let ((new-preds (eval-preds (rewrite-preds-rules idb edb))))
+    (if (predicate= idb new-preds)
+        new-preds
+        (naive-evaluation new-preds edb))))
 
-  )
+;; (setq colpreds
+;;       (rules
+;;         (t (x y)
+;;            (in (x z) t)
+;;            (in (z y) r))
+;;         (t (x y)
+;;            (in (x y) r))
+;;         (r (x y z)
+;;            (in (x y z) r))))
+
+;; (rule-list (nth-value 0 (gethash 't colpreds))) 
+;; (rule-list (nth-value 0 (gethash 'r colpreds))) 
+
+;; (setq colpreds2
+;;       (rewrite-preds-rules colpreds (make-hash-table))) 
+
+;; (rules-rewrite (nth-value 0 (gethash 't colpreds2))) 
+;; (rule-list (nth-value 0 (gethash 'r colpreds2))) 
+
+;; to trace
+;; rule-to-compr
+
+(setq colpreds3
+      (naive-evaluation
+       (rules
+         (t (x y)
+            (in (x z) t)
+            (in (z y) r))
+         (t (x y)
+            (in (x y) r))
+         (r (x y z)
+            (in (x y z) r)))
+       (make-hash-table))) 
+
+(rules-rewrite (nth-value 0 (gethash 'r colpreds3))) 
+(rules-rewrite (nth-value 0 (gethash 't colpreds3))) 
+(current-value (nth-value 0 (gethash 't colpreds3))) 
+(setq test
+      (rule-list (nth-value 0 (gethash 't colpreds3))))
+
+;; (equal '(((X Y) (IN (X Y) R)) ((X Y) (IN (X Z) T) (IN (Z Y) R))) test) 
 
 
-
+;; (setq test '((X Y) (IN (X Y) NIL) (in (x z) nil)))
+;; (rule-to-compr2 (car test) (cdr test))
 
 ;; (compr '(x y)
 ;;   (in (x y) '(1 2 3) '(4 5 6)))
 
 
+;; (setq (symbol-value gtest) gentest)
+
+
+;; (setq gentent2 gentest)
+
+;; gentest2
+
+;; (setq gentest3 (eval gentest))
+
+
+;; gentest2
+
+;; (defmacro rule-to-compr (head &body body)
+;;   `(compr-pm (list ,@head)
+;;      ,@(to-inzip body)))
+
+
 ;; variable processing
-(defun variable-p (x)
-  "Is X a named variable (a symbol beginning with '?')?"
-  (symbolp-r x
-    (equal (char (symbol-name x) 0) #\?)))
+;; (defun variable-p (x)
+;;   "Is X a named variable (a symbol beginning with '?')?"
+;;   (symbolp-r x
+;;     (equal (char (symbol-name x) 0) #\?)))
 
-;; (defun anonvar-p (x)
-;;   "Is X an anonymous variable (an underscore symbol)?"
-;;   (symbolp-r x (equal (char (symbol-name x) 0) #\_)))
+;; ;; (defun anonvar-p (x)
+;; ;;   "Is X an anonymous variable (an underscore symbol)?"
+;; ;;   (symbolp-r x (equal (char (symbol-name x) 0) #\_)))
 
-(variable-p '?xa)
-;; (anonvar-p '__)
+;; (variable-p '?xa)
+;; ;; (anonvar-p '__)
 
-;; constant processing
-(defun unbound-is-string (x)
-  (handler-case (eval x)
-    (unbound-variable () (symbol-name x))))
+;; ;; constant processing
+;; (defun unbound-is-string (x)
+;;   (handler-case (eval x)
+;;     (unbound-variable () (symbol-name x))))
 
-(defun typep-rs (x types)
-  (if (member t (mapcar #'(lambda (ty) (typep x ty)) types))
-      t))
+;; (defun typep-rs (x types)
+;;   (if (member t (mapcar #'(lambda (ty) (typep x ty)) types))
+;;       t))
 
-(defun typep-r (x types)
-  "Is X a type of an element of the specified list?"
-  (let ((v (unbound-is-string x)))
-    (typep-rs v types)))
+;; (defun typep-r (x types)
+;;   "Is X a type of an element of the specified list?"
+;;   (let ((v (unbound-is-string x)))
+;;     (typep-rs v types)))
 
-(defun constant-p (x)
-  "Is X a constant (a number, string, or boolean)?"
-  (and (not (variable-p x))
-       ;; (not (anonvar-p x))
-       (typep-r x '(number string boolean))))
+;; (defun constant-p (x)
+;;   "Is X a constant (a number, string, or boolean)?"
+;;   (and (not (variable-p x))
+;;        ;; (not (anonvar-p x))
+;;        (typep-r x '(number string boolean))))
 
-(constant-p 'nil)
-
-
-;; (and (symbolp '1)
-;;      (not (variable-p '1))
-;;      (not (anonvar-p '1))
-;;      (typep-r '1 '(number string boolean)))
-
-;; predicate processing
-(defun predicate-p (x)
-  "Is X a predicate?"
-  (symbolp-r x (alpha-char-p (char (symbol-name x) 0))))
-
-(predicate-p 'a)
-
-;; atom processing
+;; (constant-p 'nil)
 
 
-(defun class-find (id-reader id class-list)
-  (find-if #'(lambda (class) (equal (slot-value class id-reader) id)) class-list))
+;; ;; (and (symbolp '1)
+;; ;;      (not (variable-p '1))
+;; ;;      (not (anonvar-p '1))
+;; ;;      (typep-r '1 '(number string boolean)))
 
-(defun find-name (name class-list)
-  (class-find 'name name class-list))
+;; ;; predicate processing
+;; (defun predicate-p (x)
+;;   "Is X a predicate?"
+;;   (symbolp-r x (alpha-char-p (char (symbol-name x) 0))))
+
+;; (predicate-p 'a)
+
+;; ;; atom processing
+
+
+;; (defun class-find (id-reader id class-list)
+;;   (find-if #'(lambda (class) (equal (slot-value class id-reader) id)) class-list))
+
+;; (defun find-name (name class-list)
+;;   (class-find 'name name class-list))
 
 
 
-;; select columns of variables in terms
-;; filter based on columns of constants
+;; ;; select columns of variables in terms
+;; ;; filter based on columns of constants
 
-(defun collect-keyvalue (fun plist)
-  (loop for (key value) on plist by #'cddr
-        collect (funcall fun key value)))
+;; (defun collect-keyvalue (fun plist)
+;;   (loop for (key value) on plist by #'cddr
+;;         collect (funcall fun key value)))
 
-(defun mapplist (function plist)
-  (loop for (key value) on plist by #'cddr
-        collect key
-        collect (funcall function value)))
+;; (defun mapplist (function plist)
+;;   (loop for (key value) on plist by #'cddr
+;;         collect key
+;;         collect (funcall function value)))
 
-(defun mapplist-kv (function plist)
-  (loop for (key value) on plist by #'cddr
-        collect key
-        collect (funcall function key value)))
+;; (defun mapplist-kv (function plist)
+;;   (loop for (key value) on plist by #'cddr
+;;         collect key
+;;         collect (funcall function key value)))
 
-(defun constants-p-list (row constants)
-  (collect-keyvalue (lambda (k v) (equal v (getf row k))) constants))
 ;; (defun constants-p-list (row constants)
-;;   (loop for (key value) on constants by #'cddr
-;;         collect (equal value (getf row key))))
+;;   (collect-keyvalue (lambda (k v) (equal v (getf row k))) constants))
+;; ;; (defun constants-p-list (row constants)
+;; ;;   (loop for (key value) on constants by #'cddr
+;; ;;         collect (equal value (getf row key))))
 
 
-(constants-p-list '(:a 1 :b 2) '(:a 1 :b 3))
+;; (constants-p-list '(:a 1 :b 2) '(:a 1 :b 3))
 
-(defun constants-p (row constants)
-  (every #'identity (constants-p-list row constants)))
+;; (defun constants-p (row constants)
+;;   (every #'identity (constants-p-list row constants)))
 
-(constants-p '(:a 1 :b 2) '(:a 1 :b 3))
+;; (constants-p '(:a 1 :b 2) '(:a 1 :b 3))
 
-(defun filter-rows (rows constants)
-  (remove-if-not #'(lambda (row)
-                     (constants-p row constants))
-                 rows))
+;; (defun filter-rows (rows constants)
+;;   (remove-if-not #'(lambda (row)
+;;                      (constants-p row constants))
+;;                  rows))
 
-(defun values-as-keys (row k v)
-  "Example: (:name . ?X) become (?X . v)"
-  (cons v (getf row k)))
+;; (defun values-as-keys (row k v)
+;;   "Example: (:name . ?X) become (?X . v)"
+;;   (cons v (getf row k)))
 
-;; (defmacro values-as-keys (row k v)
-;;   `(cons (intern (string ,v) "KEYWORD") (getf ,row ,k)))
+;; ;; (defmacro values-as-keys (row k v)
+;; ;;   `(cons (intern (string ,v) "KEYWORD") (getf ,row ,k)))
 
-(defun assoc-variables (row variables)
-  (collect-keyvalue (lambda (k v) (values-as-keys row k v))
-                    variables))
+;; (defun assoc-variables (row variables)
+;;   (collect-keyvalue (lambda (k v) (values-as-keys row k v))
+;;                     variables))
 
-(defun select-column (rows variables)
-  "Returns a substitution"
-  (apply #'append (mapcar #'(lambda (row) (assoc-variables row variables)) rows)))
+;; (defun select-column (rows variables)
+;;   "Returns a substitution"
+;;   (apply #'append (mapcar #'(lambda (row) (assoc-variables row variables)) rows)))
 
-(defun terms-variables (terms)
-  (apply #'append (collect-keyvalue (lambda (k v)
-                                      (if (variable-p v) (list k v)))
-                                    terms)))
+;; (defun terms-variables (terms)
+;;   (apply #'append (collect-keyvalue (lambda (k v)
+;;                                       (if (variable-p v) (list k v)))
+;;                                     terms)))
 
-(defun terms-constants (terms)
-  (apply #'append (collect-keyvalue (lambda (k v)
-                                      (if (not (variable-p v)) (list k v)))
-                                    terms)))
+;; (defun terms-constants (terms)
+;;   (apply #'append (collect-keyvalue (lambda (k v)
+;;                                       (if (not (variable-p v)) (list k v)))
+;;                                     terms)))
 
-(defun query-rows (rows terms)
-  (let ((variables (terms-variables terms))
-        (constants (terms-constants terms)))
-    ;; (cons variables constants)
-    (select-column (filter-rows rows constants) variables)
-    ))
-
-
-(defun query-table (table terms)
-  (query-rows (rows table) terms))
+;; (defun query-rows (rows terms)
+;;   (let ((variables (terms-variables terms))
+;;         (constants (terms-constants terms)))
+;;     ;; (cons variables constants)
+;;     (select-column (filter-rows rows constants) variables)
+;;     ))
 
 
-;; query evaluation
-
-;; (fact ?X const) means select all X in fact with cons
-
-;; unification
-(defun get-binding (x bindings)
-  (assoc x bindings))
-
-(get-binding 'x '((x . 1) (y . 2) '(x . 3)))
-
-(defun add-binding (bindings left right)
-  (cons (cons left right)
-        (if (eq t (caar bindings))
-            nil
-            bindings)))
-
-(defun unify-term (left right &optional bindings)
-  (cond
-    ((equal right left) (or bindings (cons (cons t right) nil))
-     ;;(add-binding bindings right left)
-     )
-    ((variable-p left)  (unify-var left right bindings))
-    ((variable-p right) (unify-var right left bindings))
-    (t (error "~S and ~S cannot be unified" left right))))
-
-(defun unify-var (var x bindings)
-  (let ((var-in-bindings (get-binding var bindings))
-        (x-in-bindings (get-binding x bindings)))
-    (cond
-      (var-in-bindings
-       (unify-term (cdr var-in-bindings) x bindings))
-      ((and (variable-p x) x-in-bindings)
-       (unify-term var (cdr x-in-bindings) bindings))
-      (t (add-binding bindings var x)))))
-
-(defmacro zip (&rest lists)
-  `(mapcar #'list ,@lists))
-
-(defun unify-zipped (zipped &optional bindings)
-  (let ((left (first (car zipped)))
-        (right (second (car zipped))))
-    (if (null zipped)
-        bindings
-        (unify-zipped (cdr zipped)
-               (unify-term left right bindings)))))
-
-(defun unify (left right &optional bindings)
-  (ignore-errors
-   (reverse (unify-zipped (zip left right) bindings))))
+;; (defun query-table (table terms)
+;;   (query-rows (rows table) terms))
 
 
-(setq unify1 (unify-term '?x '?y)) 
-(setq unify2 (unify-term "abc" '?y unify1)) 
-(setq unify3 (unify-term '?y '?x unify1)) 
-(setq unify3 (unify-term '?x '?x)) 
+;; ;; query evaluation
 
-(setq unify3 (unify '(?x ?z) '(?z ?y))) 
+;; ;; (fact ?X const) means select all X in fact with cons
 
-;; (setq zipped (zip '(1 2 3) '(11 22 33) '(111 222 333)))
-(setq unify-list (unify '(?x ?y a) '(?y ?x ?x)))
-(setq unify-list (unify '(?x ?c ?y) '(a b c)))
-(mapcar #'cdr unify-list)
+;; ;; unification
+;; (defun get-binding (x bindings)
+;;   (assoc x bindings))
 
-(setq unify-list (unify '(?x "a") '(?y "a")))
-;; (setq unify-list (unify '(?x ?x ?x) '(?y ?y ?y)))
-;; (setq unify-list (unify '(?y ?x) '(?x ?y)))
-;; (setq unify-list (unify '(?y ?x ?x) '(?x ?y a)))
-;; (setq unify-list (unify '(?x ?x ?x) '(a ?y ?y)))
-;; (setq unify-list (unify '(a ?y ?x) '(?x ?y ?y)))
-;; (setq unify-list (unify '(?y ?x ?x) '(?x ?y a)))
-;; (setq unify-list (unify '(?x ?x ?y) '(?x ?y a) '((?y . ?x))))
+;; (get-binding 'x '((x . 1) (y . 2) '(x . 3)))
 
-;; (setq unify-list (unify '(?x) '(?y) '((?x . a))))
-;; (setq unify-list (unify '((f ?x)) '((f ?y))))
-;; (setq unify-list (unify '(?x ?z) '(?z ?y)))
-;; (setq unify-list (unify '(abc ?x ?y) '(bac a b)))
+;; (defun add-binding (bindings left right)
+;;   (cons (cons left right)
+;;         (if (eq t (caar bindings))
+;;             nil
+;;             bindings)))
 
-;; (setq unify-list (unify '(?x b) '(?x s)))
+;; (defun unify-term (left right &optional bindings)
+;;   (cond
+;;     ((equal right left) (or bindings (cons (cons t right) nil))
+;;      ;;(add-binding bindings right left)
+;;      )
+;;     ((variable-p left)  (unify-var left right bindings))
+;;     ((variable-p right) (unify-var right left bindings))
+;;     (t (error "~S and ~S cannot be unified" left right))))
 
-;; (defun unify-facts (facts)
-;;   (cond ((null facts) nil)
-;;         ((null (cdr facts)) facts)
-;;         (t (unify (second facts) (first facts) (unify-facts (cdr facts))))))
+;; (defun unify-var (var x bindings)
+;;   (let ((var-in-bindings (get-binding var bindings))
+;;         (x-in-bindings (get-binding x bindings)))
+;;     (cond
+;;       (var-in-bindings
+;;        (unify-term (cdr var-in-bindings) x bindings))
+;;       ((and (variable-p x) x-in-bindings)
+;;        (unify-term var (cdr x-in-bindings) bindings))
+;;       (t (add-binding bindings var x)))))
 
-;; (setq uf1 (unify-facts '((?x ?x ?y)
-;;                          (?x ?y a)
-;;                          (?y ?x ?x))))
-;; substitution
+;; (defmacro zip (&rest lists)
+;;   `(mapcar #'list ,@lists))
 
+;; (defun unify-zipped (zipped &optional bindings)
+;;   (let ((left (first (car zipped)))
+;;         (right (second (car zipped))))
+;;     (if (null zipped)
+;;         bindings
+;;         (unify-zipped (cdr zipped)
+;;                (unify-term left right bindings)))))
 
-;; (defmacro ignore-errors-nw (&rest forms)
-;;   `(handler-bind
-;;        (progn ,@forms)
-;;      (error (condition) (values nil condition))))
-
-;; will cause a warning... use handler-bind instead later perhaps
-(defun unify-row (terms row)
-  (ignore-errors
-   (mapplist-kv
-    #'(lambda (k v)
-        (cdar (unify-term v (getf row k))))
-    terms)))
-
-(setq unifyt (unify-term 'a 'a))
-;; (cdar unifyt)
-(setq unifyr (unify-row '(:a ?x :b 2) '(:a "x" :b 2)))
-(setq unifyr (unify-row '(:a ?x :b 2) '(:a ?y :b 2)))
-(setq unifyr (unify-row '(:a ?x :b 2) '(:a "x" :b 3)))
-(setq unifyr
-      (unify-row '(:name ?x     :role "severed")
-                 '(:name "Mark" :role "severed")))
-(setq unifyr
-      (unify-row '(:name ?x     :role ?z)
-                 '(:name ?z     :role ?y)))
-
-(defun mapnonnil (function list)
-  "mapcar but only collect non-nil results" 
-  (loop for i in list
-        for result = (funcall function i)
-        when result
-          collect result))
+;; (defun unify (left right &optional bindings)
+;;   (ignore-errors
+;;    (reverse (unify-zipped (zip left right) bindings))))
 
 
-;; (defun binary-composition (function list-rx list-ry list-sy list-sz)
-;;   "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
-;;   (compr (cons x z)
-;;     (in (x y1) list-rx list-ry)
-;;     (in (y2 z) list-sy list-sz)
-;;     (equal y1 y2)))
+;; (setq unify1 (unify-term '?x '?y)) 
+;; (setq unify2 (unify-term "abc" '?y unify1)) 
+;; (setq unify3 (unify-term '?y '?x unify1)) 
+;; (setq unify3 (unify-term '?x '?x)) 
 
-;; (defun bincomp (list-rx list-ry list-sy list-sz)
-;;   "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
-;;   (binary-composition #'cons list-rx list-ry list-sy list-sz))
+;; (setq unify3 (unify '(?x ?z) '(?z ?y))) 
 
-;; (bincomp '(a b c d e)
-;;          '(1 2 3 4 5)
-;;          '(3 7 2 6 4)
-;;          '(v w x y z))
+;; ;; (setq zipped (zip '(1 2 3) '(11 22 33) '(111 222 333)))
+;; (setq unify-list (unify '(?x ?y a) '(?y ?x ?x)))
+;; (setq unify-list (unify '(?x ?c ?y) '(a b c)))
+;; (mapcar #'cdr unify-list)
+
+;; (setq unify-list (unify '(?x "a") '(?y "a")))
+;; ;; (setq unify-list (unify '(?x ?x ?x) '(?y ?y ?y)))
+;; ;; (setq unify-list (unify '(?y ?x) '(?x ?y)))
+;; ;; (setq unify-list (unify '(?y ?x ?x) '(?x ?y a)))
+;; ;; (setq unify-list (unify '(?x ?x ?x) '(a ?y ?y)))
+;; ;; (setq unify-list (unify '(a ?y ?x) '(?x ?y ?y)))
+;; ;; (setq unify-list (unify '(?y ?x ?x) '(?x ?y a)))
+;; ;; (setq unify-list (unify '(?x ?x ?y) '(?x ?y a) '((?y . ?x))))
+
+;; ;; (setq unify-list (unify '(?x) '(?y) '((?x . a))))
+;; ;; (setq unify-list (unify '((f ?x)) '((f ?y))))
+;; ;; (setq unify-list (unify '(?x ?z) '(?z ?y)))
+;; ;; (setq unify-list (unify '(abc ?x ?y) '(bac a b)))
+
+;; ;; (setq unify-list (unify '(?x b) '(?x s)))
+
+;; ;; (defun unify-facts (facts)
+;; ;;   (cond ((null facts) nil)
+;; ;;         ((null (cdr facts)) facts)
+;; ;;         (t (unify (second facts) (first facts) (unify-facts (cdr facts))))))
+
+;; ;; (setq uf1 (unify-facts '((?x ?x ?y)
+;; ;;                          (?x ?y a)
+;; ;;                          (?y ?x ?x))))
+;; ;; substitution
 
 
-(defun union-plist (plist1 plist2)
-  ;; (compr (k (or (getf plist1 k) (getf plist2 k)))
-  ;;   (in k (union (keys plist1) (keys plist2))))
-  (let ((keys (union (keys plist1) (keys plist2))))
-    (loop for k in keys
-          collect k
-          collect (or (getf plist1 k) (getf plist2 k)))))
+;; ;; (defmacro ignore-errors-nw (&rest forms)
+;; ;;   `(handler-bind
+;; ;;        (progn ,@forms)
+;; ;;      (error (condition) (values nil condition))))
 
-(union-plist '(:v1 1 :c 1 :v2 1) '(:v2 1 :v3 2))
+;; ;; will cause a warning... use handler-bind instead later perhaps
+;; (defun unify-row (terms row)
+;;   (ignore-errors
+;;    (mapplist-kv
+;;     #'(lambda (k v)
+;;         (cdar (unify-term v (getf row k))))
+;;     terms)))
+
+;; (setq unifyt (unify-term 'a 'a))
+;; ;; (cdar unifyt)
+;; (setq unifyr (unify-row '(:a ?x :b 2) '(:a "x" :b 2)))
+;; (setq unifyr (unify-row '(:a ?x :b 2) '(:a ?y :b 2)))
+;; (setq unifyr (unify-row '(:a ?x :b 2) '(:a "x" :b 3)))
+;; (setq unifyr
+;;       (unify-row '(:name ?x     :role "severed")
+;;                  '(:name "Mark" :role "severed")))
+;; (setq unifyr
+;;       (unify-row '(:name ?x     :role ?z)
+;;                  '(:name ?z     :role ?y)))
+
+;; (defun mapnonnil (function list)
+;;   "mapcar but only collect non-nil results" 
+;;   (loop for i in list
+;;         for result = (funcall function i)
+;;         when result
+;;           collect result))
 
 
-;; (defun join-pred (function row1 row2)
+;; ;; (defun binary-composition (function list-rx list-ry list-sy list-sz)
+;; ;;   "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
+;; ;;   (compr (cons x z)
+;; ;;     (in (x y1) list-rx list-ry)
+;; ;;     (in (y2 z) list-sy list-sz)
+;; ;;     (equal y1 y2)))
+
+;; ;; (defun bincomp (list-rx list-ry list-sy list-sz)
+;; ;;   "(x . z) <- list-rx X list-sz when (y <- list-ry) = (y <- list-sy)"
+;; ;;   (binary-composition #'cons list-rx list-ry list-sy list-sz))
+
+;; ;; (bincomp '(a b c d e)
+;; ;;          '(1 2 3 4 5)
+;; ;;          '(3 7 2 6 4)
+;; ;;          '(v w x y z))
+
+
+;; (defun union-plist (plist1 plist2)
+;;   ;; (compr (k (or (getf plist1 k) (getf plist2 k)))
+;;   ;;   (in k (union (keys plist1) (keys plist2))))
+;;   (let ((keys (union (keys plist1) (keys plist2))))
+;;     (loop for k in keys
+;;           collect k
+;;           collect (or (getf plist1 k) (getf plist2 k)))))
+
+;; (union-plist '(:v1 1 :c 1 :v2 1) '(:v2 1 :v3 2))
+
+
+;; ;; (defun join-pred (function row1 row2)
+;; ;;   "Rows are plists"
+;; ;;   (loop for (k1 v1) on row1 by #'cddr
+;; ;;         when (equal v1 (getf row2 k1))
+;; ;;           return (funcall function row1 row2)))
+
+;; (defun join-pred (row1 row2)
 ;;   "Rows are plists"
 ;;   (loop for (k1 v1) on row1 by #'cddr
 ;;         when (equal v1 (getf row2 k1))
-;;           return (funcall function row1 row2)))
+;;           return t))
 
-(defun join-pred (row1 row2)
-  "Rows are plists"
-  (loop for (k1 v1) on row1 by #'cddr
-        when (equal v1 (getf row2 k1))
-          return t))
+;; ;; (defun join-pred (row1 row2)
+;; ;;   (compr t
+;; ;;     (in (k1 v1))))
 
-;; (defun join-pred (row1 row2)
-;;   (compr t
-;;     (in (k1 v1))))
+;; ;; (join-pred '(:v1 1 :v2 2) '(:v2 2 :v3 3))
 
-;; (join-pred '(:v1 1 :v2 2) '(:v2 2 :v3 3))
 
+;; (defun natural-join (relation1 relation2)
+;;   "Combine relations if there is a common attribute"
+;;   (compr (union-plist r s)
+;;     (in r relation1)
+;;     (in s relation2)
+;;     (join-pred r s)))
 
-(defun natural-join (relation1 relation2)
-  "Combine relations if there is a common attribute"
-  (compr (union-plist r s)
-    (in r relation1)
-    (in s relation2)
-    (join-pred r s)))
+;; (alias natural-join join)
 
-(alias natural-join join)
+;; (setq join1
+;;       (natural-join '((:name "Harry" :empid 3415 :deptname "Finance")
+;;                       (:name "Sally" :empid 2241 :deptname "Sales")
+;;                       (:name "George" :empid 3401 :deptname "Finance")
+;;                       (:name "Harriet" :empid 2202 :deptname "Sales")
+;;                       (:name "Mary" :empid 1257 :deptname "Human Resources"))
 
-(setq join1
-      (natural-join '((:name "Harry" :empid 3415 :deptname "Finance")
-                      (:name "Sally" :empid 2241 :deptname "Sales")
-                      (:name "George" :empid 3401 :deptname "Finance")
-                      (:name "Harriet" :empid 2202 :deptname "Sales")
-                      (:name "Mary" :empid 1257 :deptname "Human Resources"))
+;;                     '((:deptname "Finance" :manager "George")
+;;                       (:deptname "Sales" :manager "Harriet")
+;;                       (:deptname "Production" :manager "Charles"))))
 
-                    '((:deptname "Finance" :manager "George")
-                      (:deptname "Sales" :manager "Harriet")
-                      (:deptname "Production" :manager "Charles"))))
 
+;; ;; (defun eval-table (terms table)
+;; ;;   (mapnonnil #'(lambda (row)
+;; ;;                  (unify-row terms row))
+;; ;;              (rows table)))
 
-;; (defun eval-table (terms table)
-;;   (mapnonnil #'(lambda (row)
-;;                  (unify-row terms row))
-;;              (rows table)))
+;; ;; (defun eval-rule (db rule)
+;; ;;   (let ((tables (tables db))
+;; ;;         (rules  (rules db)))
+;; ;;     ))
 
-;; (defun eval-rule (db rule)
-;;   (let ((tables (tables db))
-;;         (rules  (rules db)))
-;;     ))
 
 
+;; ;; (defun fix (function &optional value)
+;; ;;   "Repeatedly apply 'function' until value equals value applied to function"
+;; ;;   (let ((next (funcall function value)))
+;; ;;     (if (equal value next)
+;; ;;         value
+;; ;;         (fix function next))))
 
-;; (defun fix (function &optional value)
-;;   "Repeatedly apply 'function' until value equals value applied to function"
-;;   (let ((next (funcall function value)))
-;;     (if (equal value next)
-;;         value
-;;         (fix function next))))
+;; ;; (defun fac (f)
+;; ;;   (lambda (n)
+;; ;;     (case n
+;; ;;       (0 1)
+;; ;;       (t (* n (funcall f (- n 1)))))))
 
-;; (defun fac (f)
-;;   (lambda (n)
-;;     (case n
-;;       (0 1)
-;;       (t (* n (funcall f (- n 1)))))))
+;; ;; (setq fix-test (fix (lambda (x) (+ 5)) 1))
 
-;; (setq fix-test (fix (lambda (x) (+ 5)) 1))
+;; ;; (defun fact (n) (fix (lambda (x) (fac x)) n))
 
-;; (defun fact (n) (fix (lambda (x) (fac x)) n))
+;; ;; (setq fix-test (fact 5))
+;; (defun find-fact (fact tables)
+;;   "note: facts are defined as rules without a body"
+;;   (find-if #'(lambda (table) (equal (name table) (name fact))) tables))
 
-;; (setq fix-test (fact 5))
-(defun find-fact (fact tables)
-  "note: facts are defined as rules without a body"
-  (find-if #'(lambda (table) (equal (name table) (name fact))) tables))
+;; (alias find-fact match-rows)
 
-(alias find-fact match-rows)
+;; ;; (defun eval-fact (db fact)
+;; ;;   "Evaluate a fact (which can be from a query or from the body of a rule)"
+;; ;;   (let ((head (head fact))
+;; ;;         (table? (find-fact fact (tables db)))
+;; ;;         ;;(rules (rules db))
+;; ;;         )
+;; ;;     (cond (table? (eval-table head table?))
+;; ;;           (t (error "fact not in ~S" (name db))))))
 
-;; (defun eval-fact (db fact)
-;;   "Evaluate a fact (which can be from a query or from the body of a rule)"
-;;   (let ((head (head fact))
-;;         (table? (find-fact fact (tables db)))
-;;         ;;(rules (rules db))
-;;         )
-;;     (cond (table? (eval-table head table?))
-;;           (t (error "fact not in ~S" (name db))))))
+;; ;; (defun eval-fact (fact tables &optional bindings)
+;; ;;   "Evaluate a fact (which can be from a query or from the body of a rule)"
+;; ;;   )
 
-;; (defun eval-fact (fact tables &optional bindings)
-;;   "Evaluate a fact (which can be from a query or from the body of a rule)"
-;;   )
 
+;; ;; (defun collect-p (rule ilist elist)
+;; ;;   "Collect a list of rules with the same name (and head structure)"
+;; ;;   )
 
-;; (defun collect-p (rule ilist elist)
-;;   "Collect a list of rules with the same name (and head structure)"
-;;   )
+;; ;; (defun tables-to-subst-rows (tables))
 
-;; (defun tables-to-subst-rows (tables))
+;; ;; (defun subst-rows-to-tables (subst-rows))
 
-;; (defun subst-rows-to-tables (subst-rows))
+;; ;; (defun walk-body (body bindings-tables))
 
-;; (defun walk-body (body bindings-tables))
+;; ;; (defun tables-to-grounds (tables)
+;; ;;   "tables - list (name X schema X list row) -> facts - list (name X row)"
+;; ;;   (compr (make-rule (name table) (pure p))
+;; ;;     (in table tables)
+;; ;;     (in p (rows table))))
 
-;; (defun tables-to-grounds (tables)
-;;   "tables - list (name X schema X list row) -> facts - list (name X row)"
-;;   (compr (make-rule (name table) (pure p))
-;;     (in table tables)
-;;     (in p (rows table))))
-
-;; (setq table1
-;;       (mk-table :table1 (:v1 :colour :v2)
-;;         (1 red 2)
-;;         (2 blue 1)
-;;         (2 green 3)
-;;         (1 blue 4)
-;;         (3 red 4)
-;;         (4 yellow 5)))
-;; (rows table1)
-
-;; (compr (cons (name i) (head i))
-;;   (in i (tables-to-grounds (pure table1))))
-
-
-;; (defun eval-grounds0 (terms table)
-;;   "terms -> table -> name X list substitution"
-;;   (compr (cons (name table) f)
-;;     (in row (rows table))
-;;     (in f (pure (unify terms row)))
-;;     (identity f)))
-
-;; (setq subst1 (eval-grounds0 '(?x ?c ?y) table1))
+;; ;; (setq table1
+;; ;;       (mk-table :table1 (:v1 :colour :v2)
+;; ;;         (1 red 2)
+;; ;;         (2 blue 1)
+;; ;;         (2 green 3)
+;; ;;         (1 blue 4)
+;; ;;         (3 red 4)
+;; ;;         (4 yellow 5)))
+;; ;; (rows table1)
+
+;; ;; (compr (cons (name i) (head i))
+;; ;;   (in i (tables-to-grounds (pure table1))))
 
+
+;; ;; (defun eval-grounds0 (terms table)
+;; ;;   "terms -> table -> name X list substitution"
+;; ;;   (compr (cons (name table) f)
+;; ;;     (in row (rows table))
+;; ;;     (in f (pure (unify terms row)))
+;; ;;     (identity f)))
 
-;; if variable
+;; ;; (setq subst1 (eval-grounds0 '(?x ?c ?y) table1))
 
-;; if name equals subst-row name then if that doesnt exist yet in the substitiution then
-;; push that
-
-;; if not then 
 
-;; (defun esrow (name head subst-row)
-;;   (compr
-;;       (if )
-;;     (in term head)
-;;     (in st (cdr subst-row))
-;;     ))
+;; ;; if variable
 
-;; (defun eval-grounds1 (name head substitutions)
-;;   ;; (bind
-;;   ;;  substitutions
-;;   ;;  (lambda (subst)
-;;   ;;    (if (string= name (car subst))
-;;   ;;        (pure subst))))
-;;   (compr srow
-;;     (in subst substitutions)
-;;     (in srow (cdr subst))
-;;     ))
+;; ;; if name equals subst-row name then if that doesnt exist yet in the substitiution then
+;; ;; push that
 
-;; (setq subst2 (eval-grounds1 :r1 '(?x ?y) subst1))
+;; ;; if not then 
 
+;; ;; (defun esrow (name head subst-row)
+;; ;;   (compr
+;; ;;       (if )
+;; ;;     (in term head)
+;; ;;     (in st (cdr subst-row))
+;; ;;     ))
 
-;; (setq rule1
-;;       (mk-rule :rule1 (?x ?y)
-;;         (:table1 (?x ?c ?y))))
-;; (body rule1)
+;; ;; (defun eval-grounds1 (name head substitutions)
+;; ;;   ;; (bind
+;; ;;   ;;  substitutions
+;; ;;   ;;  (lambda (subst)
+;; ;;   ;;    (if (string= name (car subst))
+;; ;;   ;;        (pure subst))))
+;; ;;   (compr srow
+;; ;;     (in subst substitutions)
+;; ;;     (in srow (cdr subst))
+;; ;;     ))
 
+;; ;; (setq subst2 (eval-grounds1 :r1 '(?x ?y) subst1))
 
-;; (defun delta-init (idb edb)
-;;   (compr (eval-table (head p) tb)
-;;     (in p idb)
-;;     (= (length (body p)) 1)
-;;     (in tb (find-fact p edb))
-;;     ;; (and (= (length (body p)) 1)
-;;     ;;      (find-fact p edb))
-;;     ))
 
-;; (db-eval-init
-;;  '((1 2 3) (4 5 6)))
+;; ;; (setq rule1
+;; ;;       (mk-rule :rule1 (?x ?y)
+;; ;;         (:table1 (?x ?c ?y))))
+;; ;; (body rule1)
 
-;; before evaluating a query, evaluate the entire program first
-;; (defun eval-db (idb &optional edb bindings-db)
-;;   "semi-naive evaluation"
-;;   (let ()
-;;     ))
 
+;; ;; (defun delta-init (idb edb)
+;; ;;   (compr (eval-table (head p) tb)
+;; ;;     (in p idb)
+;; ;;     (= (length (body p)) 1)
+;; ;;     (in tb (find-fact p edb))
+;; ;;     ;; (and (= (length (body p)) 1)
+;; ;;     ;;      (find-fact p edb))
+;; ;;     ))
 
-;; printing
-;; (defun print-list (list)
-;;   (dolist (e list)
-;;     (print e)))
+;; ;; (db-eval-init
+;; ;;  '((1 2 3) (4 5 6)))
 
-;; (defun print-rows (table) (print-list (rows table)))
-;; (defun print-query (query) (print-list query))
+;; ;; before evaluating a query, evaluate the entire program first
+;; ;; (defun eval-db (idb &optional edb bindings-db)
+;; ;;   "semi-naive evaluation"
+;; ;;   (let ()
+;; ;;     ))
 
 
-;; ;; testing
-;; (defvar *sample-schema*
-;;   (make-schema
-;;    (:name string)
-;;    (:role string)
-;;    ))
+;; ;; printing
+;; ;; (defun print-list (list)
+;; ;;   (dolist (e list)
+;; ;;     (print e)))
 
-;; (defvar *sample-table*
-;;   (make-instance
-;;    'table
-;;    :name :sample-table
-;;    :schema *sample-schema*))
+;; ;; (defun print-rows (table) (print-list (rows table)))
+;; ;; (defun print-query (query) (print-list query))
 
-;; (setf (rows *sample-table*) nil)
 
-;; (insert-rows *sample-table*
-;;              '(:name "Milchick" :role "manager")
-;;              '(:name "Mark"     :role "severed")
-;;              '(:name "Helly"    :role "severed")
-;;              '(:name "Irving"   :role "severed")
-;;              '(:name "Dylan"    :role "severed")
-;;              )
+;; ;; ;; testing
+;; ;; (defvar *sample-schema*
+;; ;;   (make-schema
+;; ;;    (:name string)
+;; ;;    (:role string)
+;; ;;    ))
 
-;; ;; (defvar *sample-rows*
-;; ;;   (rows *sample-table*))
+;; ;; (defvar *sample-table*
+;; ;;   (make-instance
+;; ;;    'table
+;; ;;    :name :sample-table
+;; ;;    :schema *sample-schema*))
 
-;; (print-rows *sample-table*)
+;; ;; (setf (rows *sample-table*) nil)
 
-;; (setq *sample-db*
-;;       (make-instance
-;;        'database
-;;        :name :sample-db))
+;; ;; (insert-rows *sample-table*
+;; ;;              '(:name "Milchick" :role "manager")
+;; ;;              '(:name "Mark"     :role "severed")
+;; ;;              '(:name "Helly"    :role "severed")
+;; ;;              '(:name "Irving"   :role "severed")
+;; ;;              '(:name "Dylan"    :role "severed")
+;; ;;              )
 
-;; (ins-table *sample-db* *sample-table*)
+;; ;; ;; (defvar *sample-rows*
+;; ;; ;;   (rows *sample-table*))
 
-;; (tables *sample-db*)
+;; ;; (print-rows *sample-table*)
 
-;; (setq *sample-rule*
-;;       (make-rule :sample-rule '(:boss ?x :employee ?y)
-;;                               '((:sample-table (:name ?x :role "manager"))
-;;                                 (:sample-table (:name ?y :role "severed")))
-;;                  *sample-db*))
+;; ;; (setq *sample-db*
+;; ;;       (make-instance
+;; ;;        'database
+;; ;;        :name :sample-db))
 
-;; (ins-rule *sample-db* *sample-rule*)
+;; ;; (ins-table *sample-db* *sample-table*)
 
-;; (mapcar #'name (tables *sample-db*)) 
+;; ;; (tables *sample-db*)
 
-;; (setq *sample-rules* (rules *sample-db*))
+;; ;; (setq *sample-rule*
+;; ;;       (make-rule :sample-rule '(:boss ?x :employee ?y)
+;; ;;                               '((:sample-table (:name ?x :role "manager"))
+;; ;;                                 (:sample-table (:name ?y :role "severed")))
+;; ;;                  *sample-db*))
 
-;; (mapcar #'head (body (car *sample-rules*))) 
+;; ;; (ins-rule *sample-db* *sample-rule*)
 
-;; (setq sample-query
-;;       '(:name ?name
-;;         :role "severed"
-;;         ))
+;; ;; (mapcar #'name (tables *sample-db*)) 
 
-;; (defvar *sample-table-query*)
+;; ;; (setq *sample-rules* (rules *sample-db*))
 
-;; (setq *sample-table-query*
-;;       (query-table *sample-table* sample-query))
+;; ;; (mapcar #'head (body (car *sample-rules*))) 
 
-;; (print-query *sample-table-query*)
+;; ;; (setq sample-query
+;; ;;       '(:name ?name
+;; ;;         :role "severed"
+;; ;;         ))
 
-;; (setq evt (eval-table sample-query *sample-table*))
-;; (print-query evt)
+;; ;; (defvar *sample-table-query*)
 
+;; ;; (setq *sample-table-query*
+;; ;;       (query-table *sample-table* sample-query))
 
-;; (setq query-to-rule (mk-rule :sample-table sample-query nil))
-;; (head query-to-rule)
+;; ;; (print-query *sample-table-query*)
 
-;; (setq evf (eval-fact *sample-db* query-to-rule))
+;; ;; (setq evt (eval-table sample-query *sample-table*))
+;; ;; (print-query evt)
 
-;; (find-fact query-to-rule (tables *sample-db*))
 
+;; ;; (setq query-to-rule (mk-rule :sample-table sample-query nil))
+;; ;; (head query-to-rule)
 
+;; ;; (setq evf (eval-fact *sample-db* query-to-rule))
 
+;; ;; (find-fact query-to-rule (tables *sample-db*))
 
 
-;; newwwwww
+
+
+
+;; ;; newwwwww
