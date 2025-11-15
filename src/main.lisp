@@ -33,6 +33,12 @@
              hashtbl)
     new-hashtbl))
 
+(defun equalnilerr (x y)
+  (if (equal x y)
+      t
+      (error "~S is not equal to ~S" x y)))
+
+;; (equalnilerr 1 2)
 
 
 (alias mapcan mappend)
@@ -77,8 +83,8 @@
   "Can X be a lambda variable?"
   (symbolp-r x
     (not (boundp x))
-    ;;(not (fboundp x))
-    (both-case-p (char (symbol-name x) 0))))
+    (or (both-case-p (char (symbol-name x) 0))
+        (symbol= '_ x))))
 
 ;; (defmacro id-var (symbol list)
 ;;   `(identity (if (equal ',symbol (car ',list))
@@ -500,9 +506,12 @@
 (validate-fact
  '(t (1 2) (3 4)))
 
-(facts
-  (t (1 2) (3 4))
-  (r (1 2 3) (4 5 6) (7 8 9)))
+(setq facttest
+      (facts
+        (t (1 2) (3 4))
+        (r (1 2 3) (4 5 6) (7 8 9))))
+
+(nth-value 0 (gethash 'r facttest))
 
 ;; (compr (if (not (= x 3)) x (error "no"))
 ;;   (in x '(1 2 3)))
@@ -527,10 +536,10 @@
    (cond
      ((nth-value 1 (gethash (third datom) predicates))
       `(in ,(second datom)
-           ,(current-value (nth-value 0 (gethash (third datom) predicates)))))
+           ',(current-value (nth-value 0 (gethash (third datom) predicates)))))
      ((nth-value 1 (gethash (third datom) edb))
       `(in ,(second datom)
-           ,(nth-value 0 (gethash (third datom) predicates))))
+           ',(nth-value 0 (gethash (third datom) edb))))
      (t (error "~S not found in database" (third datom))))))
 
 
@@ -556,7 +565,11 @@
 ;;      ,@(to-inzip body)))
 
 (defun rule-to-compr (rule)
-  (eval (rule-compr-gen (car rule) (cdr rule))))
+  ;; hacky solution because eval mutates the previous declared quotes for some reason
+  (let ((*read-eval* nil)
+        (compr-string
+          (write-to-string (rule-compr-gen (car rule) (cdr rule)))))
+    (eval (read-from-string compr-string))))
 
 (defun rule-compr-gen (head body)
   `(compr-pm (list ,@head)
@@ -598,9 +611,9 @@
 ;;                       ',rules)))))
 
 (defun eval-rules (rules)
-  (reduce #'lunion
-          (mapcar #'rule-to-compr
-                  rules)))
+  (reduce #'lunion (mapcar #'rule-to-compr rules)))
+
+(lunions nil nil '((a b c) (d e f)))
 
 ;; (rule-to-compr2 (x y)
 ;;                 ((in (x z) '((1 2) (3 4)))
@@ -610,12 +623,20 @@
 (setq r '(1 2 3))
 ;; (eval `(apply #'+ ',r))
 
-(defun predicate= (pred1 pred2)
+(defun predicate=nilerr (pred1 pred2)
   (map-hashtbl
    #'(lambda (p)
-       (equal (current-value p)
-              (current-value (nth-value 0 (gethash (pred-name p) pred2)))))
+       (equalnilerr (current-value p)
+                    (current-value (nth-value 0 (gethash (pred-name p) pred2)))))
    pred1))
+
+(defun predicate= (pred1 pred2)
+  (restart-case (predicate=nilerr pred1 pred2)
+    (predicates-not-equal ()
+      nil)))
+
+;; (defun equaltest (one two)
+;;   (equal one two))
 
 (defun naive-evaluation (idb edb)
   (let ((new-preds (eval-preds (rewrite-preds-rules idb edb))))
@@ -627,9 +648,18 @@
 ;;       (rules
 ;;         (t (x y)
 ;;            (in (x z) t)
-;;            (in (z y) r))
+;;            (in (z y _) r))
 ;;         (t (x y)
-;;            (in (x y) r))
+;;            (in (x y _) r))
+;;         (r (x y z)
+;;            (in (x y z) r))))
+;; (setq colpreds
+;;       (rules
+;;         (t (x y)
+;;            (in (x z) t)
+;;            (in (z y _) r))
+;;         (t (x y)
+;;            (in (x y _) r))
 ;;         (r (x y z)
 ;;            (in (x y z) r))))
 
@@ -643,27 +673,73 @@
 ;; (rule-list (nth-value 0 (gethash 'r colpreds2))) 
 
 ;; to trace
+;; naive-evaluation
+;; collect-rules
+;; eval-rules
 ;; rule-to-compr
+;; rule-compr-gen
+;; rewrite-preds-rules
+;; rules-rewrite
+;; rewrite-atoms
+;; predicate=
+;; equalnilerr
+
+;; possible cause of errors:
+;; MAIN CULPRIT:
+;; rule-list and rules-rewrite are references/pointers (because of eval and macros)
+;; possible solutions:
+;; use read-from-string instead
+;; use sharpsign dot (#.function)
+
+;; other possible causes:
+;; the naive evaluation method is wrong
+;; the rule evaluation method is wrong
+
+(funcall #'(lambda (_) (+ _ 1)) 2)  
+
+(setq colpreds3
+      (naive-evaluation
+       (rules
+         (t (x y)
+            (in (x y _) n))
+         )
+       (facts
+         (n (a b c) (d e f))))) 
+
+(current-value (nth-value 0 (gethash 't colpreds3))) 
 
 (setq colpreds3
       (naive-evaluation
        (rules
          (t (x y)
             (in (x z) t)
-            (in (z y) r))
+            (in (z y) t))
          (t (x y)
-            (in (x y) r))
-         (r (x y z)
-            (in (x y z) r)))
-       (make-hash-table))) 
+            (in (x y _) n)))
+       (facts
+         (n (a b c) (b c e))))) 
 
-(rules-rewrite (nth-value 0 (gethash 'r colpreds3))) 
+(rule-list (nth-value 0 (gethash 't colpreds3))) 
 (rules-rewrite (nth-value 0 (gethash 't colpreds3))) 
 (current-value (nth-value 0 (gethash 't colpreds3))) 
-(setq test
-      (rule-list (nth-value 0 (gethash 't colpreds3))))
+;; (setq test
+;;       (rule-list (nth-value 0 (gethash 't colpreds3))))
 
 ;; (equal '(((X Y) (IN (X Y) R)) ((X Y) (IN (X Z) T) (IN (Z Y) R))) test) 
+
+;; (compr-pm (list x y)
+;;   (inzip (x y) 'nil))
+(setq quotetest (rule-compr-gen '(x y)
+                                '((in (x y) '((1 2) (3 4))))))
+
+(setq stringtest (write-to-string quotetest))
+
+(setq stringtest2
+      (eval (read-from-string stringtest)))
+
+
+
+
 
 
 ;; (setq test '((X Y) (IN (X Y) NIL) (in (x z) nil)))
