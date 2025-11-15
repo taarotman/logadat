@@ -631,8 +631,8 @@
    pred1))
 
 (defun predicate= (pred1 pred2)
-  (restart-case (predicate=nilerr pred1 pred2)
-    (predicates-not-equal ()
+  (handler-case (predicate=nilerr pred1 pred2)
+    (error ()
       nil)))
 
 ;; (defun equaltest (one two)
@@ -684,17 +684,6 @@
 ;; predicate=
 ;; equalnilerr
 
-;; possible cause of errors:
-;; MAIN CULPRIT:
-;; rule-list and rules-rewrite are references/pointers (because of eval and macros)
-;; possible solutions:
-;; use read-from-string instead
-;; use sharpsign dot (#.function)
-
-;; other possible causes:
-;; the naive evaluation method is wrong
-;; the rule evaluation method is wrong
-
 (funcall #'(lambda (_) (+ _ 1)) 2)  
 
 (setq colpreds3
@@ -729,13 +718,13 @@
 
 ;; (compr-pm (list x y)
 ;;   (inzip (x y) 'nil))
-(setq quotetest (rule-compr-gen '(x y)
-                                '((in (x y) '((1 2) (3 4))))))
+;; (setq quotetest (rule-compr-gen '(x y)
+;;                                 '((in (x y) '((1 2) (3 4))))))
 
-(setq stringtest (write-to-string quotetest))
+;; (setq stringtest (write-to-string quotetest))
 
-(setq stringtest2
-      (eval (read-from-string stringtest)))
+;; (setq stringtest2
+;;       (eval (read-from-string stringtest)))
 
 
 
