@@ -511,20 +511,6 @@
                   (cdr fact) fact-length body)))))
 
 
-(validate-fact
- '(t (1 2) (3 4)))
-
-(setq facttest
-      (facts
-        (t (1 2) (3 4))
-        (r (1 2 3) (4 5 6) (7 8 9))))
-
-(nth-value 0 (gethash 'r facttest))
-
-;; (compr (if (not (= x 3)) x (error "no"))
-;;   (in x '(1 2 3)))
-
-
 (defun rewrite-preds-rules (predicates edb)
   (flet ((rewrite-rules (rules)
            (compr (cons (car r) (rewrite-atoms (cdr r) predicates edb))
@@ -542,6 +528,7 @@
   (forc
    (in datom rule-body)
    (cond
+     ((not (symbol= 'in (first datom))) datom)
      ((nth-value 1 (gethash (third datom) predicates))
       `(in ,(second datom)
            ',(current-value (nth-value 0 (gethash (third datom) predicates)))))
@@ -583,7 +570,6 @@
   `(compr-pm (list ,@head)
      ,@(to-inzip body)))
 
-
 (defun to-inzip (predicates)
   (forc
    (in pred predicates)
@@ -591,47 +577,12 @@
        pred
        `(inzip ,(second pred) ,(third pred)))))
 
-(to-inzip '((in 12 '(1 2 12)) (= 5 5)))
-
-(setq head '(x y))
-(setq body '(in (x y) '((1 2) (3 4))))
-
-(setq gentest (rule-to-compr (cons head (list body))))
-
-;; (defmacro rule-to-compr2 (head body)
-;;   `(rule-to-compr ,head ,@body))
-
-;; (defmacro rule-to-compr-f (rule)
-;;   `(rule-to-compr ,(car rule) ,@(cdr rule)))
-
-;; https://stackoverflow.com/questions/15669675/evaluate-the-arguments-of-a-macro-form
-;; (defun rule-to-compr-fun (rule)
-;;   (funcall (compile nil `(lambda () (rule-to-compr-f ,rule)))))
-
-;; (defun eval-rules (rules)
-;;   ;; wtf
-;;   (let ((lambdasym (gensym))
-;;         )
-;;     (declare (special lambdasym))
-;;     (eval
-;;      `(reduce #'lunion
-;;               (mapcar #'(lambda (,lambdasym) (eval (rule-to-compr-full ,lambdasym)))
-;;                       ',rules)))))
 
 (defun eval-rules (rules)
   (remove-duplicates
    (reduce #'lunion (mapcar #'rule-to-compr rules))
    :test #'equal))
 
-(lunions nil nil '((a b c) (d e f)))
-
-;; (rule-to-compr2 (x y)
-;;                 ((in (x z) '((1 2) (3 4)))
-;;                  (in (z y) '((1 1) (2 2)))))
-
-
-;; (setq r '(1 2 3))
-;; (eval `(apply #'+ ',r))
 
 (defun predicate=nilerr (pred1 pred2)
   (map-hashtbl
@@ -652,42 +603,11 @@
 ;;     (predicate-not-nill ()
 ;;       nil)))
 
-;; (defun equaltest (one two)
-;;   (equal one two))
-
 (defun naive-evaluation (idb edb)
   (let ((new-preds (eval-preds (rewrite-preds-rules idb edb))))
     (if (predicate= idb new-preds)
         new-preds
         (naive-evaluation new-preds edb))))
-
-;; (setq colpreds
-;;       (rules
-;;         (t (x y)
-;;            (in (x z) t)
-;;            (in (z y _) r))
-;;         (t (x y)
-;;            (in (x y _) r))
-;;         (r (x y z)
-;;            (in (x y z) r))))
-;; (setq colpreds
-;;       (rules
-;;         (t (x y)
-;;            (in (x z) t)
-;;            (in (z y _) r))
-;;         (t (x y)
-;;            (in (x y _) r))
-;;         (r (x y z)
-;;            (in (x y z) r))))
-
-;; (rule-list (nth-value 0 (gethash 't colpreds))) 
-;; (rule-list (nth-value 0 (gethash 'r colpreds))) 
-
-;; (setq colpreds2
-;;       (rewrite-preds-rules colpreds (make-hash-table))) 
-
-;; (rules-rewrite (nth-value 0 (gethash 't colpreds2))) 
-;; (rule-list (nth-value 0 (gethash 'r colpreds2))) 
 
 ;; to trace
 ;; naive-evaluation
@@ -719,21 +639,12 @@
        (rules
          (t (x y)
             (in (x z) t)
-            (in (z y) t))
+            (in (z y) t)
+            (equal z 'c))
          (t (x y)
             (in (x y _) n)))
        (facts
          (n (a b c) (b c e))))) 
-
-;; new error
-;; culprit: equal not working as intended (supposed equal values arent)
-;; due to list ordering
-;; solution: use set-exclusive-or instead of equal
-
-;; ARCHIVED
-;; setting rule body as a constant that isnt found will not terminate
-;; prolog produces the same behavior
-;; culprit: duplicated values
 
 (rule-list (nth-value 0 (gethash 't colpreds3))) 
 (rules-rewrite (nth-value 0 (gethash 't colpreds3))) 
@@ -781,3 +692,4 @@
 
 ;; (setq setor
 ;;       (set-exclusive-or comprtest '((a c) (b c) (b b)) :test #'equal))
+
