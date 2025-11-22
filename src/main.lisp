@@ -609,6 +609,12 @@
         new-preds
         (naive-evaluation new-preds edb))))
 
+(defmacro query-eval (pred-name pred-terms evaluated-preds)
+  `(compr-pm (list ,@pred-terms)
+     (inzip ,pred-terms
+            (current-value
+             (nth-value 0 (gethash ,pred-name ,evaluated-preds))))))
+
 ;; to trace
 ;; naive-evaluation
 ;; collect-rules
@@ -639,8 +645,7 @@
        (rules
          (t (x y)
             (in (x z) t)
-            (in (z y) t)
-            (equal z 'c))
+            (in (z y) t))
          (t (x y)
             (in (x y _) n)))
        (facts
@@ -649,6 +654,8 @@
 (rule-list (nth-value 0 (gethash 't colpreds3))) 
 (rules-rewrite (nth-value 0 (gethash 't colpreds3))) 
 (current-value (nth-value 0 (gethash 't colpreds3))) 
+
+(query-eval t (x c) colpreds3)
 
 ;; (setq colpreds3
 ;;       (naive-evaluation
