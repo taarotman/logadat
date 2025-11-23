@@ -609,11 +609,20 @@
         new-preds
         (naive-evaluation new-preds edb))))
 
-(defmacro query-eval (pred-name pred-terms evaluated-preds)
+
+(defmacro query-eval (pred-name pred-terms evaluated-preds &optional edb)
   `(compr-pm (list ,@pred-terms)
-     (inzip ,pred-terms
-            (current-value
-             (nth-value 0 (gethash ,pred-name ,evaluated-preds))))))
+     (inzip ,pred-terms (get-rule-or-fact ',pred-name
+                                          ,evaluated-preds
+                                          ,edb))))
+
+(defun get-rule-or-fact (pred-name idb edb)
+  (cond ((nth-value 1 (gethash pred-name idb))
+         (current-value (nth-value 0 (gethash pred-name idb))))
+        ((nth-value 1 (gethash pred-name edb))
+         (nth-value 0 (gethash pred-name edb)))
+        (t (error "~S not found in database for query" pred-name))))
+
 
 ;; to trace
 ;; naive-evaluation
@@ -655,7 +664,7 @@
 (rules-rewrite (nth-value 0 (gethash 't colpreds3))) 
 (current-value (nth-value 0 (gethash 't colpreds3))) 
 
-(query-eval t (x c) colpreds3)
+(query-eval t (x y) colpreds3 (facts (n (a b c) (b c e))))
 
 ;; (setq colpreds3
 ;;       (naive-evaluation
