@@ -630,10 +630,11 @@
          (reverse ,evald-queries)
          (queries-eval
           ,evaluated-preds ,edb ,(cdr query-list)
-          (cons (query-eval ,(first query)
-                            ,(second query)
-                            ,evaluated-preds
-                            ,edb)
+          (cons (cons ',(first query)
+                      (query-eval ,(first query)
+                                  ,(second query)
+                                  ,evaluated-preds
+                                  ,edb))
                 ,evald-queries)))))
 
 (defmacro queries (evaluated-preds edb &body query-list)
@@ -682,12 +683,13 @@
 (rules-rewrite (nth-value 0 (gethash 't colpreds3))) 
 (current-value (nth-value 0 (gethash 't colpreds3))) 
 
-(query-eval t (x y) colpreds3 (facts (n (a b c) (b c e))))
-(query-eval n (x y z) colpreds3 (facts (n (a b c) (b c e))))
+;; (query-eval t (x y) colpreds3 (facts (n (a b c) (b c e))))
+;; (query-eval n (x y z) colpreds3 (facts (n (a b c) (b c e))))
 
 (queries colpreds3 factstest
-  (t (x y))
-  (n (x y z)))
+  (n (x y z))
+  (n (x 'c z))
+  (t (x y)))
 
 ;; (setq colpreds3
 ;;       (naive-evaluation
