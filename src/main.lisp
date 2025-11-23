@@ -624,6 +624,22 @@
         (t (error "~S not found in database for query" pred-name))))
 
 
+(defmacro queries-eval (evaluated-preds edb query-list &optional evald-queries)
+  (let ((query (car query-list)))
+    `(if (null ',query)
+         (reverse ,evald-queries)
+         (queries-eval
+          ,evaluated-preds ,edb ,(cdr query-list)
+          (cons (query-eval ,(first query)
+                            ,(second query)
+                            ,evaluated-preds
+                            ,edb)
+                ,evald-queries)))))
+
+(defmacro queries (evaluated-preds edb &body query-list)
+  `(queries-eval ,evaluated-preds ,edb ,query-list))
+
+
 ;; to trace
 ;; naive-evaluation
 ;; collect-rules
@@ -649,6 +665,8 @@
 
 ;; (current-value (nth-value 0 (gethash 't colpreds3))) 
 
+(setq factstest (facts (n (a b c) (b c e))))
+
 (setq colpreds3
       (naive-evaluation
        (rules
@@ -665,6 +683,11 @@
 (current-value (nth-value 0 (gethash 't colpreds3))) 
 
 (query-eval t (x y) colpreds3 (facts (n (a b c) (b c e))))
+(query-eval n (x y z) colpreds3 (facts (n (a b c) (b c e))))
+
+(queries colpreds3 factstest
+  (t (x y))
+  (n (x y z)))
 
 ;; (setq colpreds3
 ;;       (naive-evaluation
