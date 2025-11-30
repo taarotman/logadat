@@ -315,6 +315,12 @@
         new-preds
         (naive-evaluation new-preds edb))))
 
+;; (defun seminaive-evaluation (idb edb)
+;;   (let ((new-preds (eval-preds (rewrite-preds-rules idb edb))))
+;;     (if (predicate= idb new-preds)
+;;         new-preds
+;;         (naive-evaluation new-preds edb))))
+
 
 (defmacro query-eval (pred-name pred-terms evaluated-preds &optional edb)
   `(compr-pm (list ,@pred-terms)
@@ -398,5 +404,6 @@
   (t ('a y)))
 
 
+(lunion '((a b c) (d e f) (g h i)) '((1 2 3) (4 5 6) (7 8 9)))
 
 ;; unit testing

@@ -1,5 +1,0 @@
-# Logadat
-
-## Usage
-
-## Installation
