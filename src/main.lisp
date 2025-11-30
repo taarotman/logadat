@@ -332,9 +332,9 @@
 
 (defmacro queries-eval (evaluated-preds edb query-list &optional evald-queries)
   (let ((query (car query-list)))
-    `(if (null ',query)
-         ,evald-queries
-         (queries-eval
+    (if (null query)
+        `,evald-queries
+        `(queries-eval
           ,evaluated-preds ,edb ,(cdr query-list)
           (cons (cons ',(first query)
                       (query-eval ,(first query)
@@ -397,3 +397,6 @@
   (t (x y))
   (t ('a y)))
 
+
+
+;; unit testing
