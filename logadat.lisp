@@ -352,6 +352,15 @@
 (defmacro queries (evaluated-preds edb &body query-list)
   `(queries-eval ,evaluated-preds ,edb ,(reverse query-list)))
 
+
+(defmacro logadat (facts rules &rest queries)
+  `(queries
+       ;; (if (null ,eval)
+       ;;     (naive-evaluation ,rules ,facts)
+       ;;     (funcall ,eval ,rules ,facts))
+       (naive-evaluation ,rules ,facts)
+       ,facts ,@queries))
+
 ;; to trace
 ;; naive-evaluation
 ;; collect-rules
@@ -403,7 +412,14 @@
   (t (x y))
   (t ('a y)))
 
-
-(lunion '((a b c) (d e f) (g h i)) '((1 2 3) (4 5 6) (7 8 9)))
+(logadat
+    factstest
+    (rules
+      (t (x y)
+         (in (x z) t)
+         (in (z y) t))
+      (t (x y)
+         (in (x y _) n)))
+  (t (x y)))
 
 ;; unit testing
