@@ -353,6 +353,7 @@
   `(queries-eval ,evaluated-preds ,edb ,(reverse query-list)))
 
 
+;; rewrite this with &allow-other-keys
 (defmacro logadat (facts rules &rest queries)
   `(queries
        ;; (if (null ,eval)
@@ -413,13 +414,22 @@
   (t ('a y)))
 
 (logadat
-    factstest
+    (facts
+      (n (a b c) (b c e)))
     (rules
       (t (x y)
          (in (x z) t)
          (in (z y) t))
       (t (x y)
          (in (x y _) n)))
-  (t (x y)))
+  (t (x y))
+  (t (x 'c)))
 
 ;; unit testing
+
+
+;; (defun ptest (&rest rval &key kval)
+;;   (list rval kval))
+
+;; (ptest 1 :kval 1)
+
