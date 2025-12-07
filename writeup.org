@@ -1,1 +1,12 @@
-* writeup
+* Datalog
+
+* List Comprehensions
+
+* Adding Join Mechanisms and Pattern Matching to List Comprehensions
+
+* A Datalog Built From List Comprehensions
+
+* Conclusion
+
+* References
+
