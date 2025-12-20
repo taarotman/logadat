@@ -350,17 +350,53 @@
                 ,evald-queries)))))
 
 (defmacro queries (evaluated-preds edb &body query-list)
-  `(queries-eval ,evaluated-preds ,edb ,(reverse query-list)))
+  `(queries-eval ,evaluated-preds ,edb ,query-list))
 
 
 ;; rewrite this with &allow-other-keys
-(defmacro logadat (facts rules &rest queries)
-  `(queries
-       ;; (if (null ,eval)
-       ;;     (naive-evaluation ,rules ,facts)
-       ;;     (funcall ,eval ,rules ,facts))
-       (naive-evaluation ,rules ,facts)
-       ,facts ,@queries))
+;; fact
+;; rule
+;; query
+;; facts
+(defun collect-body (body &optional facts rules queries eval)
+  (cond
+    ((symbol= (first body) 'rule)
+     (collect-body (cddr body) facts (cons (second body) rules) queries eval))
+    ((symbol= (first body) 'facts)
+     (collect-body (cddr body) (cons (second body) facts) rules queries eval))
+    ((symbol= (first body) 'query)
+     (collect-body (cddr body) facts rules (cons (second body) queries) eval))
+    ((symbol= (first body) 'eval)
+     (collect-body (cddr body) facts rules queries (second body)))
+    (t (values rules facts queries (or eval 'naive-evaluation)))))
+
+(defmacro logadat (&body body)
+  (let ((rules      (nth-value 0 (collect-body body)))
+        (facts      (nth-value 1 (collect-body body)))
+        (query-list (nth-value 2 (collect-body body)))
+        (eval       (nth-value 3 (collect-body body))))
+    `(queries (,eval (rules ,@rules) (facts ,@facts)) (facts ,@facts) ,@query-list)))
+
+;; (logadat
+;;     (facts
+;;       (n (a b c) (b c e)))
+;;     (rules
+;;       (t (x y)
+;;          (in (x z) t)
+;;          (in (z y) t))
+;;       (t (x y)
+;;          (in (x y _) n)))
+;;   (t (x y))
+;;   (t (x 'c)))
+
+
+;; (defmacro logadat (facts rules &rest queries)
+;;   `(queries
+;;        ;; (if (null ,eval)
+;;        ;;     (naive-evaluation ,rules ,facts)
+;;        ;;     (funcall ,eval ,rules ,facts))
+;;        (naive-evaluation ,rules ,facts)
+;;        ,facts ,@queries))
 
 ;; to trace
 ;; naive-evaluation
@@ -413,17 +449,28 @@
   (t (x y))
   (t ('a y)))
 
+;; (logadat
+;;     (facts
+;;       (n (a b c) (b c e)))
+;;     (rules
+;;       (t (x y)
+;;          (in (x z) t)
+;;          (in (z y) t))
+;;       (t (x y)
+;;          (in (x y _) n)))
+;;   (t (x y))
+;;   (t (x 'c)))
+
 (logadat
-    (facts
-      (n (a b c) (b c e)))
-    (rules
-      (t (x y)
-         (in (x z) t)
-         (in (z y) t))
-      (t (x y)
-         (in (x y _) n)))
-  (t (x y))
-  (t (x 'c)))
+  :facts (n (x y z) (a b c))
+  :rule (t (x y)
+           (in (x y _) n))
+  :rule (t (x y)
+           (in (x z) t)
+           (in (z y) t))
+  :query (t (x y))
+  :query (t (x 'c))
+  :query (n (a b c)))
 
 ;; unit testing
 
